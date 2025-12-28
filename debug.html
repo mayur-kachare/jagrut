@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jagrut Debug - Firebase Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #007AFF; }
+        h2 { color: #333; border-bottom: 2px solid #007AFF; padding-bottom: 10px; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .test-result { margin: 10px 0; padding: 10px; border-left: 4px solid #007AFF; }
+        .log-entry { font-family: monospace; font-size: 12px; margin: 5px 0; padding: 5px; background: #f8f9fa; }
+        #console-output { max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Jagrut Debug Console</h1>
+    
+    <div class="container">
+        <h2>Firebase Configuration Test</h2>
+        <div id="config-test"></div>
+        <button onclick="testFirebaseConfig()">Test Firebase Config</button>
+    </div>
+
+    <div class="container">
+        <h2>Type Casting Tests</h2>
+        <div id="type-test"></div>
+        <button onclick="testTypeCasting()">Run Type Tests</button>
+    </div>
+
+    <div class="container">
+        <h2>Firebase Initialization</h2>
+        <div id="firebase-test"></div>
+        <button onclick="testFirebaseInit()">Initialize Firebase</button>
+        <button onclick="testAuth()">Test Auth</button>
+        <button onclick="testFirestore()">Test Firestore</button>
+    </div>
+
+    <div class="container">
+        <h2>Console Output</h2>
+        <div id="console-output"></div>
+        <button onclick="clearConsole()">Clear Console</button>
+    </div>
+
+    <script type="module">
+        // Import Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAZIehZOUExwtWm3B1pwaJDyZ8G3av8GA",
+            authDomain: "jagrut-eb44c.firebaseapp.com",
+            projectId: "jagrut-eb44c",
+            storageBucket: "jagrut-eb44c.firebasestorage.app",
+            messagingSenderId: "86827920614",
+            appId: "1:86827920614:web:f912f45a936daed2365f27",
+            measurementId: "G-Q9FE6QN5ZJ"
+        };
+
+        let app, auth, db;
+
+        // Console logging
+        const logToConsole = (message, type = 'info') => {
+            const output = document.getElementById('console-output');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(entry);
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        };
+
+        window.clearConsole = () => {
+            document.getElementById('console-output').innerHTML = '';
+        };
+
+        // Test Firebase Config
+        window.testFirebaseConfig = () => {
+            const output = document.getElementById('config-test');
+            output.innerHTML = '<div class="status info">Testing configuration...</div>';
+            
+            const tests = [];
+            
+            // Check each config value
+            Object.entries(firebaseConfig).forEach(([key, value]) => {
+                const type = typeof value;
+                const isString = type === 'string';
+                const isEmpty = !value || value === '';
+                
+                tests.push(`
+                    <div class="test-result">
+                        <strong>${key}:</strong> 
+                        <span style="color: ${isString ? 'green' : 'red'}">${type}</span>
+                        ${isEmpty ? '<span style="color: red"> (EMPTY!)</span>' : ''}
+                        <br>Value: <code>${key.includes('Key') || key.includes('Id') ? '***' : value}</code>
+                    </div>
+                `);
+                
+                logToConsole(`${key}: type=${type}, isEmpty=${isEmpty}`);
+            });
+            
+            output.innerHTML = `
+                <div class="status success">✅ Configuration loaded</div>
+                ${tests.join('')}
+            `;
+        };
+
+        // Test Type Casting
+        window.testTypeCasting = () => {
+            const output = document.getElementById('type-test');
+            output.innerHTML = '<div class="status info">Running type casting tests...</div>';
+            
+            const results = [];
+            
+            try {
+                // Test 1: String to Boolean
+                const stringValue = "true";
+                const boolValue = Boolean(stringValue);
+                results.push(`✅ String to Boolean: "${stringValue}" → ${boolValue}`);
+                logToConsole(`String to Boolean test passed`);
+            } catch (e) {
+                results.push(`❌ String to Boolean failed: ${e.message}`);
+                logToConsole(`String to Boolean test failed: ${e.message}`);
+            }
+
+            try {
+                // Test 2: Type checking
+                const testObj = {
+                    string: "test",
+                    number: 123,
+                    boolean: true,
+                    object: {},
+                    array: []
+                };
+                
+                Object.entries(testObj).forEach(([key, value]) => {
+                    results.push(`Type of ${key}: ${typeof value}`);
+                });
+                logToConsole(`Type checking test passed`);
+            } catch (e) {
+                results.push(`❌ Type checking failed: ${e.message}`);
+                logToConsole(`Type checking failed: ${e.message}`);
+            }
+
+            try {
+                // Test 3: Config value types
+                const configTypes = Object.entries(firebaseConfig).map(([key, value]) => {
+                    return `${key}: ${typeof value} (${value === null ? 'null' : value === undefined ? 'undefined' : 'valid'})`;
+                });
+                results.push(...configTypes);
+                logToConsole(`Config value types test passed`);
+            } catch (e) {
+                results.push(`❌ Config types failed: ${e.message}`);
+                logToConsole(`Config types failed: ${e.message}`);
+            }
+            
+            output.innerHTML = `
+                <div class="status success">Type casting tests completed</div>
+                <pre>${results.join('\n')}</pre>
+            `;
+        };
+
+        // Test Firebase Initialization
+        window.testFirebaseInit = () => {
+            const output = document.getElementById('firebase-test');
+            output.innerHTML = '<div class="status info">Initializing Firebase...</div>';
+            
+            try {
+                logToConsole('Attempting to initialize Firebase...');
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                output.innerHTML = `
+                    <div class="status success">✅ Firebase initialized successfully!</div>
+                    <div class="test-result">
+                        <strong>App Name:</strong> ${app.name}<br>
+                        <strong>Options:</strong> <pre>${JSON.stringify(app.options, null, 2)}</pre>
+                    </div>
+                `;
+                logToConsole('✅ Firebase initialized successfully');
+            } catch (error) {
+                output.innerHTML = `
+                    <div class="status error">❌ Firebase initialization failed!</div>
+                    <div class="test-result">
+                        <strong>Error:</strong> ${error.message}<br>
+                        <strong>Stack:</strong> <pre>${error.stack}</pre>
+                    </div>
+                `;
+                logToConsole(`❌ Firebase initialization failed: ${error.message}`);
+            }
+        };
+
+        // Test Auth
+        window.testAuth = () => {
+            const output = document.getElementById('firebase-test');
+            
+            if (!auth) {
+                output.innerHTML += '<div class="status warning">⚠️ Please initialize Firebase first</div>';
+                return;
+            }
+            
+            output.innerHTML += '<div class="status info">Testing Auth...</div>';
+            logToConsole('Testing Firebase Auth...');
+            
+            signInAnonymously(auth)
+                .then(() => {
+                    output.innerHTML += '<div class="status success">✅ Auth test successful!</div>';
+                    logToConsole('✅ Auth test successful');
+                })
+                .catch((error) => {
+                    output.innerHTML += `
+                        <div class="status error">❌ Auth test failed: ${error.message}</div>
+                    `;
+                    logToConsole(`❌ Auth test failed: ${error.message}`);
+                });
+        };
+
+        // Test Firestore
+        window.testFirestore = () => {
+            const output = document.getElementById('firebase-test');
+            
+            if (!db) {
+                output.innerHTML += '<div class="status warning">⚠️ Please initialize Firebase first</div>';
+                return;
+            }
+            
+            output.innerHTML += '<div class="status info">Testing Firestore...</div>';
+            logToConsole('Testing Firestore...');
+            
+            getDocs(collection(db, 'bills'))
+                .then((querySnapshot) => {
+                    output.innerHTML += `
+                        <div class="status success">✅ Firestore test successful!</div>
+                        <div class="test-result">Documents found: ${querySnapshot.size}</div>
+                    `;
+                    logToConsole(`✅ Firestore test successful - ${querySnapshot.size} documents found`);
+                })
+                .catch((error) => {
+                    output.innerHTML += `
+                        <div class="status error">❌ Firestore test failed: ${error.message}</div>
+                    `;
+                    logToConsole(`❌ Firestore test failed: ${error.message}`);
+                });
+        };
+
+        // Auto-run config test on load
+        window.addEventListener('load', () => {
+            logToConsole('Debug console loaded');
+            testFirebaseConfig();
+        });
+    </script>
+</body>
+</html>
