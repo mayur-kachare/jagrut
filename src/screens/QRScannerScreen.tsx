@@ -1,11 +1,24 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import type { BarcodeScanningResult } from 'expo-camera';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  Linking,
+  Dimensions,
+  SafeAreaView,
+  StatusBar,
+} from 'react-native';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useAuth } from '../context/AuthContext';
 import { FirestoreService } from '../services/firestore';
 import type { Bill } from '../types';
+
+const { width } = Dimensions.get('window');
+const SCAN_SIZE = width * 0.7; // 70% of screen width
 
 interface ParsedQRCode {
   raw: string;
@@ -15,51 +28,33 @@ interface ParsedQRCode {
 export const QRScannerScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [parsed, setParsed] = useState<ParsedQRCode | null>(null);
-  const insets = useSafeAreaInsets();
 
+  // Auto-handle permissions
   useEffect(() => {
-    if (permission?.status === null) {
+    if (permission && !permission.granted) {
       requestPermission();
     }
-  }, [permission?.status, requestPermission]);
-
-  const resetScanner = useCallback(() => {
-    setScanned(false);
-    setParsed(null);
-  }, []);
+  }, [permission, requestPermission]);
 
   const handleBarcodeScanned = useCallback(
-    async (result: BarcodeScanningResult) => {
-      if (scanned) {
-        return;
-      }
+    ({ data }: BarcodeScanningResult) => {
+      if (parsed) return;
 
-      const payload = Array.isArray((result as unknown as { barcodes?: BarcodeScanningResult[] }).barcodes)
-        ? (result as unknown as { barcodes: BarcodeScanningResult[] }).barcodes[0]
-        : result;
-      const data = payload?.data;
-      if (!data) {
-        return;
-      }
-
-      setScanned(true);
       const parsedResult = parseQRCodeData(data);
       setParsed(parsedResult);
 
       if (!parsedResult.bill) {
-        Alert.alert('QR detected', 'QR code scanned but no structured data was found.');
+        Alert.alert('QR Detected', 'QR code scanned but no structured data was found.');
       }
     },
-    [scanned],
+    [parsed]
   );
 
-  const saveBill = useCallback(async () => {
+  const saveBill = async () => {
     if (!user || !parsed?.bill) {
-      Alert.alert('Unable to save', 'No bill data available from the scanned QR code.');
+      Alert.alert('Error', 'Missing required data');
       return;
     }
 
@@ -75,97 +70,145 @@ export const QRScannerScreen: React.FC<{ navigation: any }> = ({ navigation }) =
         extractedText: parsed.raw,
       });
 
-      Alert.alert('Success', 'QR bill saved successfully!', [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Home'),
-        },
+      Alert.alert('Success', 'Bill saved successfully!', [
+        { text: 'OK', onPress: () => navigation.navigate('Home') },
       ]);
-      resetScanner();
+      
+      setParsed(null);
     } catch (error) {
-      console.error('QR save error', error);
-      Alert.alert('Error', 'Failed to save bill from QR code.');
+      Alert.alert('Error', 'Failed to save bill');
+      console.error(error);
     } finally {
       setProcessing(false);
     }
-  }, [navigation, parsed, resetScanner, user]);
+  };
 
+  const handleRetake = () => {
+    setParsed(null);
+  };
+
+  // 1. Loading / Permission Transition State
   if (!permission) {
     return (
       <View style={styles.centerContent}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.permissionText}>Checking camera permission…</Text>
       </View>
     );
   }
 
+  // 2. Permission Denied State
   if (!permission.granted) {
     return (
       <View style={styles.centerContent}>
-        <Text style={styles.permissionText}>Camera access denied. Enable permissions to scan QR codes.</Text>
-        <TouchableOpacity style={styles.actionButton} onPress={requestPermission}>
-          <Text style={styles.actionButtonText}>Grant Permission</Text>
+        <Text style={styles.permissionText}>
+          Camera permission is required to scan QR codes.
+        </Text>
+        <TouchableOpacity
+          style={styles.captureButton}
+          onPress={requestPermission}
+        >
+          <Text style={styles.buttonText}>Grant Permission</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
+            <Text style={{ color: '#007AFF', fontSize: 16 }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  return (
-    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-      <View style={styles.cameraWrapper}>
+  // 3. Camera Scanning State (No data parsed yet)
+  if (!parsed) {
+    return (
+      <View style={styles.container}>
+        <StatusBar hidden />
         <CameraView
-          style={styles.camera}
+          style={StyleSheet.absoluteFill}
           facing="back"
           barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-          onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-          onCameraReady={() => setCameraReady(true)}
+          onBarcodeScanned={handleBarcodeScanned}
         />
-        <View style={styles.overlay}>
-          <Text style={styles.instructions}>
-            {cameraReady ? 'Align the QR code within the frame' : 'Starting camera…'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={[styles.footer, { paddingBottom: 20 + insets.bottom }]}>
-        {parsed ? (
-          <View style={styles.dataCard}>
-            <Text style={styles.dataTitle}>Scanned Details</Text>
-            {parsed.bill ? (
-              <>
-                <Text style={styles.dataLine}>Bill #: {parsed.bill.billNumber ?? '—'}</Text>
-                <Text style={styles.dataLine}>Amount: ₹{parsed.bill.amount ?? '—'}</Text>
-                <Text style={styles.dataLine}>From: {parsed.bill.from ?? '—'}</Text>
-                <Text style={styles.dataLine}>To: {parsed.bill.to ?? '—'}</Text>
-                <Text style={styles.dataLine}>
-                  Date: {parsed.bill.date ? parsed.bill.date.toLocaleDateString() : '—'}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.helperText}>Structured bill details not found. Try rescanning.</Text>
-            )}
+        
+        {/* Dark Overlay with Transparent Center */}
+        <View style={styles.overlayContainer}>
+          <View style={styles.overlayTop}>
+            <Text style={styles.scanText}>Scan QR Code</Text>
           </View>
-        ) : (
-          <Text style={styles.helperText}>Scan a QR code to preview the bill data.</Text>
-        )}
+          <View style={styles.overlayCenterRow}>
+            <View style={styles.overlaySide} />
+            <View style={styles.focusedContainer}>
+              {/* Corner Markers */}
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+            </View>
+            <View style={styles.overlaySide} />
+          </View>
+          <View style={styles.overlayBottom}>
+            <Text style={styles.instructionText}>Align the QR code within the frame</Text>
+          </View>
+        </View>
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={resetScanner}>
-            <Text style={styles.actionButtonText}>Rescan</Text>
+        {/* Close Button */}
+        <SafeAreaView style={styles.safeArea}>
+          <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.closeIcon}>✕</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.primaryButton, (!parsed?.bill || processing) && styles.disabledButton]}
-            onPress={saveBill}
-            disabled={!parsed?.bill || processing}
-          >
-            <Text style={styles.actionButtonText}>{processing ? 'Saving…' : 'Continue'}</Text>
-          </TouchableOpacity>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // 3. Results State (Data parsed)
+  return (
+    <ScrollView style={styles.resultContainer}>
+      <StatusBar hidden={false} />
+      <View style={styles.content}>
+        <Text style={styles.title}>Scanned Details</Text>
+        
+        <View style={styles.dataContainer}>
+            <Text style={styles.dataTitle}>Extracted Information</Text>
+            {parsed.bill ? (
+            <>
+                <Text style={styles.dataText}>Bill : {parsed.bill.billNumber || '—'}</Text>
+                <Text style={styles.dataText}>
+                Date : {parsed.bill.date?.toLocaleDateString() || '—'}
+                </Text>
+                <Text style={styles.dataText}>From : {parsed.bill.from || '—'}</Text>
+                <Text style={styles.dataText}>To : {parsed.bill.to || '—'}</Text>
+                <Text style={styles.dataText}>Amount / Fare : ₹{parsed.bill.amount || '—'}</Text>
+            </>
+            ) : (
+            <Text style={styles.dataText}>No structured data found in QR code.</Text>
+            )}
+        </View>
+
+        <View style={styles.actionButtons}>
+            <TouchableOpacity
+            style={[styles.button, styles.retakeButton]}
+            onPress={handleRetake}
+            >
+            <Text style={styles.buttonText}>Rescan</Text>
+            </TouchableOpacity>
+
+            {parsed.bill && (
+            <TouchableOpacity
+                style={[styles.button, styles.saveButton, processing && styles.buttonDisabled]}
+                onPress={saveBill}
+                disabled={processing}
+            >
+                <Text style={styles.buttonText}>
+                {processing ? 'Saving...' : 'Save Bill'}
+                </Text>
+            </TouchableOpacity>
+            )}
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
+// ... parsing logic remains the same ...
 const parseQRCodeData = (data: string): ParsedQRCode => {
   const trimmed = data.trim();
 
@@ -180,24 +223,23 @@ const parseQRCodeData = (data: string): ParsedQRCode => {
       };
     }
   } catch (error) {
-    // Ignore JSON parse errors and continue with regex parsing
+    // Ignore JSON parse errors
   }
 
-    const kvPairs = extractKeyValuePairs(trimmed);
-    const normalized = kvPairs ? normalizeBillFields(kvPairs) : null;
-    let bill: Partial<Bill> | null = normalized && hasBillValues(normalized) ? normalized : null;
+  const kvPairs = extractKeyValuePairs(trimmed);
+  const normalized = kvPairs ? normalizeBillFields(kvPairs) : null;
+  let bill: Partial<Bill> | null = normalized && hasBillValues(normalized) ? normalized : null;
 
-    if (!bill) {
-      const customBill = parseCustomMetroPayload(trimmed);
-      bill = customBill && hasBillValues(customBill) ? customBill : null;
-    }
+  if (!bill) {
+    const customBill = parseCustomMetroPayload(trimmed);
+    bill = customBill && hasBillValues(customBill) ? customBill : null;
+  }
 
-    if (!bill) {
-      const textBill = extractBillFromFreeText(trimmed);
-      bill = textBill && hasBillValues(textBill) ? textBill : null;
-    }
+  if (!bill) {
+    const textBill = extractBillFromFreeText(trimmed);
+    bill = textBill && hasBillValues(textBill) ? textBill : null;
+  }
 
-  console.log('📦 QR raw payload:', trimmed);
   return {
     raw: trimmed,
     bill,
@@ -495,7 +537,7 @@ const parseMetroDateTime = (token: string): Date | undefined => {
 };
 
 const parseHexFloat = (value: string): number | undefined => {
-  const match = value.match(/^0x([0-9a-f]+)(?:\.([0-9a-f]+))?p([+-]?\d+)$/i);
+  const match = value.match(/^0x([0-9a-f]+)(?:\.[0-9a-f]+)?p([+-]?\d+)$/i);
   if (!match) {
     return undefined;
   }
@@ -551,73 +593,73 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  cameraWrapper: {
-    flex: 2,
-    position: 'relative',
-  },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  instructions: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  footer: {
+  resultContainer: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  content: {
     padding: 20,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  buttonContainer: {
     gap: 16,
   },
-  dataCard: {
+  captureButton: {
+    backgroundColor: '#007AFF',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  processingContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  processingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  dataContainer: {
     backgroundColor: '#f5f5f5',
     padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    borderRadius: 8,
+    marginBottom: 20,
   },
   dataTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 12,
   },
-  dataLine: {
-    fontSize: 14,
+  dataText: {
+    fontSize: 16,
+    marginBottom: 8,
     color: '#333',
   },
-  helperText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  actionsRow: {
+  actionButtons: {
     flexDirection: 'row',
     gap: 12,
   },
-  actionButton: {
+  button: {
     flex: 1,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-  },
-  secondaryButton: {
+  retakeButton: {
     backgroundColor: '#666',
   },
-  disabledButton: {
+  saveButton: {
+    backgroundColor: '#34C759',
+  },
+  buttonDisabled: {
     backgroundColor: '#ccc',
   },
-  actionButtonText: {
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
@@ -626,13 +668,91 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    padding: 24,
+    padding: 40,
     gap: 16,
+    backgroundColor: '#fff',
   },
   permissionText: {
     textAlign: 'center',
     fontSize: 16,
     color: '#333',
+    marginBottom: 10,
+  },
+  
+  // Overlay Styles
+  overlayContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  overlayTop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 20,
+  },
+  overlayCenterRow: {
+    flexDirection: 'row',
+    height: SCAN_SIZE,
+  },
+  overlaySide: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  focusedContainer: {
+    width: SCAN_SIZE,
+    height: SCAN_SIZE,
+    // Transparent center
+  },
+  overlayBottom: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  scanText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  instructionText: {
+    color: '#ccc',
+    fontSize: 14,
+  },
+  
+  // Corner Markers
+  corner: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderColor: '#fff',
+    borderWidth: 4,
+  },
+  cornerTL: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0 },
+  cornerTR: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0 },
+  cornerBL: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0 },
+  cornerBR: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0 },
+
+  // Close Button
+  safeArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+  },
+  closeButton: {
+    marginLeft: 20,
+    marginTop: 10,
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeIcon: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });

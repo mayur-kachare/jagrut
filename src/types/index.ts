@@ -1,6 +1,8 @@
 export interface User {
   id: string;
   phoneNumber: string;
+  name?: string;
+  photoUrl?: string;
   createdAt: Date;
 }
 

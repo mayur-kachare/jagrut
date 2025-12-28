@@ -15,7 +15,7 @@ export class AuthService {
     return true;
   }
 
-  static async verifyOTP(phoneNumber: string, otp: string): Promise<User | null> {
+  static async verifyOTP(phoneNumber: string, otp: string, name?: string, photoUrl?: string): Promise<User | null> {
     // Mock verification - accept "123456" as valid OTP
     if (otp === '123456') {
       try {
@@ -32,10 +32,13 @@ export class AuthService {
         if (!querySnapshot.empty) {
           // Existing user - retrieve their data
           const userDoc = querySnapshot.docs[0];
+          const userData = userDoc.data();
           user = {
             id: userDoc.id,
-            phoneNumber: userDoc.data().phoneNumber,
-            createdAt: userDoc.data().createdAt.toDate(),
+            phoneNumber: userData.phoneNumber,
+            name: userData.name,
+            photoUrl: userData.photoUrl,
+            createdAt: userData.createdAt.toDate(),
           };
           console.log('✅ Existing user logged in:', phoneNumber);
         } else {
@@ -43,6 +46,8 @@ export class AuthService {
           const userId = phoneNumber.replace(/[^0-9]/g, ''); // Use phone number as ID
           const newUser = {
             phoneNumber,
+            name: name || '',
+            photoUrl: photoUrl || '',
             createdAt: new Date(),
           };
           
@@ -50,8 +55,7 @@ export class AuthService {
           
           user = {
             id: userId,
-            phoneNumber,
-            createdAt: new Date(),
+            ...newUser,
           };
           console.log('✅ New user created:', phoneNumber);
         }
@@ -97,5 +101,23 @@ export class AuthService {
   static async logout(): Promise<void> {
     await AsyncStorage.removeItem(this.STORAGE_KEY);
     console.log('✅ User logged out');
+  }
+
+  static async updateProfile(userId: string, data: { name?: string; photoUrl?: string }): Promise<void> {
+    try {
+      // Update in Firestore
+      const userRef = doc(db, this.USERS_COLLECTION, userId);
+      await setDoc(userRef, data, { merge: true });
+
+      // Update in AsyncStorage
+      const currentUser = await this.getCurrentUser();
+      if (currentUser) {
+        const updatedUser = { ...currentUser, ...data };
+        await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
   }
 }

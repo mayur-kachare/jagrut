@@ -5,7 +5,7 @@ import { AuthService } from '../services/auth';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (phoneNumber: string, otp: string) => Promise<boolean>;
+  login: (phoneNumber: string, otp: string, name?: string, photoUrl?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   sendOTP: (phoneNumber: string) => Promise<boolean>;
 }
@@ -35,8 +35,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return await AuthService.sendOTP(phoneNumber);
   };
 
-  const login = async (phoneNumber: string, otp: string): Promise<boolean> => {
-    const verifiedUser = await AuthService.verifyOTP(phoneNumber, otp);
+  const login = async (phoneNumber: string, otp: string, name?: string, photoUrl?: string): Promise<boolean> => {
+    const verifiedUser = await AuthService.verifyOTP(phoneNumber, otp, name, photoUrl);
     if (verifiedUser) {
       setUser(verifiedUser);
       return true;

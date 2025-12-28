@@ -6,12 +6,14 @@ import { LoginScreen } from '../screens/LoginScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CameraScreen } from '../screens/CameraScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
   Camera: undefined;
   QRScanner: undefined;
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -46,6 +48,13 @@ export const AppNavigator: React.FC = () => {
               component={HomeScreen}
               options={{
                 headerShown: false,
+              }}
+            />
+            <Stack.Screen
+              name="Profile"
+              component={ProfileScreen}
+              options={{
+                title: 'Edit Profile',
               }}
             />
             <Stack.Screen

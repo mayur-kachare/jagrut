@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { OCRService } from '../services/ocr';
@@ -20,44 +21,91 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [image, setImage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<Partial<Bill> | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<ImagePicker.PermissionStatus | null>(null);
   const { user } = useAuth();
+
+  React.useEffect(() => {
+    (async () => {
+      const { status } = await ImagePicker.getCameraPermissionsAsync();
+      setCameraPermission(status);
+    })();
+  }, []);
 
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Camera permission is required to take photos');
+    setCameraPermission(status);
+    if (status !== ImagePicker.PermissionStatus.GRANTED) {
+      Alert.alert(
+        'Permission Required',
+        'Camera permission is required to take photos. Please enable it in your device settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: Linking.openSettings }
+        ]
+      );
       return false;
     }
     return true;
   };
 
   const takePhoto = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+    console.log('📸 takePhoto called');
+    try {
+      const hasPermission = await requestPermissions();
+      console.log('📸 Permission status:', hasPermission);
+      if (!hasPermission) return;
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
+      console.log('📸 Launching camera...');
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
+      console.log('📸 Camera result:', result.canceled ? 'Canceled' : 'Success');
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      await processImage(result.assets[0].uri);
+      if (!result.canceled) {
+        setImage(result.assets[0].uri);
+        await processImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error taking photo:', error);
+      Alert.alert('Error', 'Failed to open camera: ' + (error as any).message);
     }
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
+    console.log('🖼️ pickImage called');
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('🖼️ Media permission:', status);
+      if (status !== ImagePicker.PermissionStatus.GRANTED) {
+        Alert.alert(
+          'Permission Required',
+          'Gallery permission is required to select photos.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: Linking.openSettings }
+          ]
+        );
+        return;
+      }
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      await processImage(result.assets[0].uri);
+      console.log('🖼️ Launching image library...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+      console.log('🖼️ Image library result:', result.canceled ? 'Canceled' : 'Success');
+
+      if (!result.canceled) {
+        setImage(result.assets[0].uri);
+        await processImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to open gallery: ' + (error as any).message);
     }
   };
 
@@ -136,14 +184,23 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
             {extractedData && !processing && (
               <View style={styles.dataContainer}>
-                <Text style={styles.dataTitle}>Extracted Information:</Text>
-                <Text style={styles.dataText}>Bill #: {extractedData.billNumber}</Text>
-                <Text style={styles.dataText}>Amount: ₹{extractedData.amount}</Text>
-                <Text style={styles.dataText}>From: {extractedData.from}</Text>
-                <Text style={styles.dataText}>To: {extractedData.to}</Text>
+                <Text style={styles.dataTitle}>Extracted Information</Text>
+                <Text style={styles.dataText}>Bill : {extractedData.billNumber || '—'}</Text>
                 <Text style={styles.dataText}>
-                  Date: {extractedData.date?.toLocaleDateString()}
+                  Date : {extractedData.date?.toLocaleDateString() || '—'}
                 </Text>
+                <Text style={styles.dataText}>From : {extractedData.from || '—'}</Text>
+                <Text style={styles.dataText}>To : {extractedData.to || '—'}</Text>
+                <Text style={styles.dataText}>Amount / Fare : ₹{extractedData.amount || '—'}</Text>
+                
+                {extractedData.extractedText && (
+                  <View style={styles.rawTextContainer}>
+                    <Text style={styles.rawTextTitle}>Raw Text:</Text>
+                    <ScrollView style={styles.rawTextScroll} nestedScrollEnabled>
+                      <Text style={styles.rawTextContent}>{extractedData.extractedText}</Text>
+                    </ScrollView>
+                  </View>
+                )}
               </View>
             )}
 
@@ -254,5 +311,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  centerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 40,
+    gap: 16,
+  },
+  permissionText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 10,
+  },
+  rawTextContainer: {
+    marginTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    paddingTop: 12,
+  },
+  rawTextTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#666',
+  },
+  rawTextScroll: {
+    maxHeight: 150,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 8,
+  },
+  rawTextContent: {
+    fontSize: 12,
+    color: '#333',
+    fontFamily: 'monospace',
   },
 });

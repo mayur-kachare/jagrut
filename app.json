@@ -39,7 +39,9 @@
         {
           "photosPermission": "Allow Jagrut to access your photos to select bills."
         }
-      ]
+      ],
+      "onnxruntime-react-native",
+      "./plugins/withOnnxManualLinking"
     ]
   }
 }

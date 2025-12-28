@@ -71,10 +71,23 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello! 👋</Text>
-          <Text style={styles.phoneNumber}>{user?.phoneNumber}</Text>
-        </View>
+        <TouchableOpacity 
+          style={styles.userInfo} 
+          onPress={() => navigation.navigate('Profile')}
+        >
+          {user?.photoUrl ? (
+            <Image source={{ uri: user.photoUrl }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profilePlaceholder}>
+              <Text style={styles.profileInitial}>
+                {user?.name ? user.name[0].toUpperCase() : 'U'}
+              </Text>
+            </View>
+          )}
+          <View>
+            <Text style={styles.greeting}>Hello, {user?.name || 'User'}! 👋</Text>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -89,10 +102,6 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{stats.billCount}</Text>
             <Text style={styles.statLabel}>Bills</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.totalDistance} km</Text>
-            <Text style={styles.statLabel}>Distance</Text>
           </View>
         </View>
       )}
@@ -122,9 +131,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               </View>
             }
           />
-        ) : (
-          <Text style={styles.collapsedHint}>Tap + to view bills</Text>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.cameraContainer}>
@@ -135,13 +142,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.cameraIcon}>📷</Text>
           <Text style={styles.cameraLabel}>Capture Bill</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.cameraButton}
           onPress={() => navigation.navigate('QRScanner')}
         >
           <Text style={styles.cameraIcon}>🔳</Text>
           <Text style={styles.cameraLabel}>Scan QR</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
@@ -160,14 +167,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  greeting: {
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  profilePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitial: {
+    color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
   },
-  phoneNumber: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  greeting: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   logoutButton: {
     padding: 8,
@@ -184,17 +209,17 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 16,
+    padding: 8,
     borderRadius: 12,
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#007AFF',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
     marginTop: 4,
   },
@@ -227,13 +252,13 @@ const styles = StyleSheet.create({
   billCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    padding: 6,
+    marginBottom: 6,
     flexDirection: 'row',
   },
   billImage: {
-    width: 80,
-    height: 80,
+    width: 40,
+    height: 40,
     borderRadius: 8,
   },
   billDetails: {
@@ -242,12 +267,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   billNumber: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
     marginBottom: 4,
   },
   billAmount: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#34C759',
     marginBottom: 4,
@@ -278,8 +303,8 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   cameraButton: {
-    width: 120,
-    height: 120,
+    width: 96,
+    height: 96,
     borderRadius: 24,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
@@ -292,7 +317,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cameraIcon: {
-    fontSize: 32,
+    fontSize: 26,
   },
   cameraLabel: {
     fontSize: 14,
