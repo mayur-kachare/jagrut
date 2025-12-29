@@ -10,7 +10,7 @@ import {
   ScrollView,
   Linking,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import { OCRService } from '../services/ocr';
 import { FirestoreService } from '../services/firestore';
 import { ImageCompressor } from '../utils/imageCompressor';
@@ -21,55 +21,32 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [image, setImage] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<Partial<Bill> | null>(null);
-  const [cameraPermission, setCameraPermission] = useState<ImagePicker.PermissionStatus | null>(null);
   const { user } = useAuth();
-
-  React.useEffect(() => {
-    (async () => {
-      const { status } = await ImagePicker.getCameraPermissionsAsync();
-      setCameraPermission(status);
-    })();
-  }, []);
-
-  const requestPermissions = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    setCameraPermission(status);
-    if (status !== ImagePicker.PermissionStatus.GRANTED) {
-      Alert.alert(
-        'Permission Required',
-        'Camera permission is required to take photos. Please enable it in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Settings', onPress: Linking.openSettings }
-        ]
-      );
-      return false;
-    }
-    return true;
-  };
 
   const takePhoto = async () => {
     console.log('📸 takePhoto called');
     try {
-      const hasPermission = await requestPermissions();
-      console.log('📸 Permission status:', hasPermission);
-      if (!hasPermission) return;
-
-      console.log('📸 Launching camera...');
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-        // Remove aspect ratio constraint to allow freeform cropping
-        // aspect: [4, 3], 
+      const image = await ImageCropPicker.openCamera({
+        width: 1024,
+        height: 1024,
+        cropping: true,
+        freeStyleCropEnabled: true,
+        mediaType: 'photo',
+        compressImageQuality: 0.8,
       });
-      console.log('📸 Camera result:', result.canceled ? 'Canceled' : 'Success');
 
-      if (!result.canceled) {
+      console.log('📸 Camera result:', image.path);
+
+      if (image.path) {
         try {
-          const originalUri = result.assets[0].uri;
+          const originalUri = image.path;
+          // Ensure URI has file:// prefix for consistency if needed, though ImageCropPicker usually returns it or just path
+          // But for consistency with previous logic:
+          const uri = originalUri.startsWith('file://') ? originalUri : `file://${originalUri}`;
+          
           console.log('📸 Compressing image before processing...');
-          const compressedUri = await ImageCompressor.compressImage(originalUri);
+          // We can skip extra compression if ImageCropPicker already compressed it, but keeping it for safety/consistency
+          const compressedUri = await ImageCompressor.compressImage(uri);
           console.log('📸 Compression complete:', compressedUri);
           
           setImage(compressedUri);
@@ -80,44 +57,35 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           Alert.alert('Error', 'Failed to process photo');
         }
       }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to open camera: ' + (error as any).message);
+    } catch (error: any) {
+      if (error.code !== 'E_PICKER_CANCELLED') {
+        console.error('Error taking photo:', error);
+        Alert.alert('Error', 'Failed to open camera: ' + error.message);
+      }
     }
   };
 
   const pickImage = async () => {
     console.log('🖼️ pickImage called');
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      console.log('🖼️ Media permission:', status);
-      if (status !== ImagePicker.PermissionStatus.GRANTED) {
-        Alert.alert(
-          'Permission Required',
-          'Gallery permission is required to select photos.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: Linking.openSettings }
-          ]
-        );
-        return;
-      }
-
-      console.log('🖼️ Launching image library...');
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-        // Remove aspect ratio constraint to allow freeform cropping
-        // aspect: [4, 3],
+      const image = await ImageCropPicker.openPicker({
+        width: 1024,
+        height: 1024,
+        cropping: true,
+        freeStyleCropEnabled: true,
+        mediaType: 'photo',
+        compressImageQuality: 0.8,
       });
-      console.log('🖼️ Image library result:', result.canceled ? 'Canceled' : 'Success');
 
-      if (!result.canceled) {
+      console.log('🖼️ Image library result:', image.path);
+
+      if (image.path) {
         try {
-          const originalUri = result.assets[0].uri;
+          const originalUri = image.path;
+          const uri = originalUri.startsWith('file://') ? originalUri : `file://${originalUri}`;
+
           console.log('🖼️ Compressing image before processing...');
-          const compressedUri = await ImageCompressor.compressImage(originalUri);
+          const compressedUri = await ImageCompressor.compressImage(uri);
           console.log('🖼️ Compression complete:', compressedUri);
           
           setImage(compressedUri);
@@ -128,9 +96,11 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           Alert.alert('Error', 'Failed to process image');
         }
       }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to open gallery: ' + (error as any).message);
+    } catch (error: any) {
+      if (error.code !== 'E_PICKER_CANCELLED') {
+        console.error('Error picking image:', error);
+        Alert.alert('Error', 'Failed to open gallery: ' + error.message);
+      }
     }
   };
 
