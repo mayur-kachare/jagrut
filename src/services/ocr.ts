@@ -15,27 +15,45 @@ export class OCRService {
       // 1. Try to scan QR code first
       console.log('🔍 Scanning for QR codes...');
       let qrData: Partial<Bill> = {};
+      /*
       try {
-        const barcodes = await BarcodeScanning.scan(scanUri, {
-          formats: [BarcodeFormat.QR_CODE],
-        });
+        // Wrap in try-catch to prevent native crash from propagating if possible
+        // Also, BarcodeScanning might be unstable on some devices with large images
+        // Note: scan() only accepts one argument (uri) in this version of the library
+        const barcodes = await BarcodeScanning.scan(scanUri);
 
         if (barcodes && barcodes.length > 0) {
-          const rawValue = barcodes[0].rawValue;
-          console.log('✅ QR Code detected:', rawValue);
-          if (rawValue) {
-            qrData = OCRService.parseQRData(rawValue);
+          // Filter for QR codes if needed, or just take the first one
+          const qrCode = barcodes.find(b => b.format === BarcodeFormat.QR_CODE) || barcodes[0];
+          
+          if (qrCode) {
+             const rawValue = qrCode.value || qrCode.rawValue; // Handle potential property name differences
+             console.log('✅ QR Code detected:', rawValue);
+             if (rawValue) {
+               qrData = OCRService.parseQRData(rawValue);
+             }
           }
         } else {
           console.log('⚠️ No QR code found.');
         }
       } catch (qrError) {
-        console.warn('⚠️ QR Scan failed:', qrError);
+        console.warn('⚠️ QR Scan failed (continuing to OCR):', qrError);
       }
+      */
 
       // 2. Run OCR for text extraction (always needed for From/To)
       console.log('🔍 Running ML Kit OCR...');
-      const result = await TextRecognition.recognize(scanUri);
+      let result;
+      try {
+         result = await TextRecognition.recognize(scanUri);
+      } catch (ocrError) {
+         console.error('❌ TextRecognition failed:', ocrError);
+         // If OCR fails, but we have QR data, return that
+         if (Object.keys(qrData).length > 0) {
+            return { ...OCRService.getMockData(), ...qrData, extractedText: 'QR Only (OCR Failed)' };
+         }
+         throw ocrError;
+      }
 
       if (!result || !result.text) {
         console.log('⚠️ ML Kit returned no text.');
@@ -114,9 +132,9 @@ export class OCRService {
     if (dateMatch) dateVal = dateMatch[1];
 
     let amountVal = '';
-    const inrMatch = text.match(/INR\s*(\d+(?:\.\d+)?)/i);
-    if (inrMatch) {
-        amountVal = `INR ${inrMatch[1]}`;
+    const currencyMatch = text.match(/(?:INR|Rs|₹)\.?\s*(\d+(?:\.\d+)?)/i);
+    if (currencyMatch) {
+        amountVal = currencyMatch[0];
     } else {
         const floatMatch = text.match(/\b(\d+\.\d{1,2})\b/);
         if (floatMatch) amountVal = floatMatch[1];
@@ -127,7 +145,7 @@ export class OCRService {
         if (line !== upper) return false; 
         if (line.length < 3) return false;
         // Removed PMC from exclusion list so it can be detected as a location
-        if (/DATE|FROM|TO|FARE|TICKET|VALID|PLATFORM|INR/.test(upper) && upper.length < 10) return false; 
+        if (/DATE|FROM|TO|FARE|TICKET|VALID|PLATFORM|INR|RS/.test(upper) && upper.length < 10) return false; 
         if (/\d/.test(line)) return false; 
         return true;
     });
@@ -136,7 +154,7 @@ export class OCRService {
     const toVal = locationCandidates[1] || '';
 
     // 3. Label Beautification & Reconstruction
-    const labels = ['Date', 'From', 'To', 'Fare', 'Charge', 'Amount', 'Ticket', 'Bill', 'Invoice'];
+    const labels = ['Date', 'From', 'To', 'Fare', 'Charge', 'Amount', 'Ticket', 'Tickat', 'Bill', 'Invoice'];
     const reconstructedLines = rawLines.map(line => {
         // Check if this line IS one of our identified values, if so, we'll label it later or here
         const upper = line.toUpperCase();
@@ -149,9 +167,17 @@ export class OCRService {
 
         for (const label of labels) {
             if (line.toLowerCase().startsWith(label.toLowerCase())) {
-                const value = line.substring(label.length).replace(/^[:\- 	]+/, '').trim();
-                if (value) return `${label} : ${value}`;
-                return label; 
+                // Remove label, then remove separators, then remove "NO", "No", "#" etc.
+                const value = line.substring(label.length)
+                    .replace(/^[:\- 	]+/, '')
+                    .replace(/^(?:NO|N0|Number|#)[:\- 	]*/i, '')
+                    .trim();
+                
+                // Normalize label "Tickat" to "Ticket"
+                const displayLabel = label === 'Tickat' ? 'Ticket' : label;
+                
+                if (value) return `${displayLabel} : ${value}`;
+                return displayLabel; 
             }
         }
         return line;
@@ -178,7 +204,7 @@ export class OCRService {
     }
 
     return {
-      billNumber: text.match(/(?:Ticket|Bill)\s*(?:N0|No|#)\s*[:\-]?\s*([A-Z0-9T]+)/i)?.[1] || `BILL${Date.now()}`,
+      billNumber: text.match(/(?:Tick[ae]t|Bill|Invoice)\s*(?:N0|No|#|Number)?\s*[:\-]?\s*([A-Z0-9T]+)/i)?.[1] || `BILL${Date.now()}`,
       amount: parseFloat(amountVal.replace(/[^0-9.]/g, '')) || 0,
       date: dateObj,
       from: fromVal || 'Unknown',

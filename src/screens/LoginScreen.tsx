@@ -77,6 +77,7 @@ export const LoginScreen: React.FC = () => {
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
             editable={!otpSent}
+            underlineColorAndroid="transparent"
           />
 
           {!otpSent ? (
@@ -99,6 +100,7 @@ export const LoginScreen: React.FC = () => {
                 onChangeText={setOtp}
                 keyboardType="number-pad"
                 maxLength={6}
+                underlineColorAndroid="transparent"
               />
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -162,6 +164,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
+    color: '#000',
   },
   button: {
     backgroundColor: '#007AFF',

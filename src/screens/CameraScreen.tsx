@@ -60,12 +60,25 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
+        // Remove aspect ratio constraint to allow freeform cropping
+        // aspect: [4, 3], 
       });
       console.log('📸 Camera result:', result.canceled ? 'Canceled' : 'Success');
 
       if (!result.canceled) {
-        setImage(result.assets[0].uri);
-        await processImage(result.assets[0].uri);
+        try {
+          const originalUri = result.assets[0].uri;
+          console.log('📸 Compressing image before processing...');
+          const compressedUri = await ImageCompressor.compressImage(originalUri);
+          console.log('📸 Compression complete:', compressedUri);
+          
+          setImage(compressedUri);
+          // Small delay to ensure file is ready and UI updates
+          setTimeout(() => processImage(compressedUri), 500);
+        } catch (error) {
+          console.error('Error handling camera result:', error);
+          Alert.alert('Error', 'Failed to process photo');
+        }
       }
     } catch (error) {
       console.error('Error taking photo:', error);
@@ -94,14 +107,26 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        aspect: [4, 3],
         quality: 0.8,
+        // Remove aspect ratio constraint to allow freeform cropping
+        // aspect: [4, 3],
       });
       console.log('🖼️ Image library result:', result.canceled ? 'Canceled' : 'Success');
 
       if (!result.canceled) {
-        setImage(result.assets[0].uri);
-        await processImage(result.assets[0].uri);
+        try {
+          const originalUri = result.assets[0].uri;
+          console.log('🖼️ Compressing image before processing...');
+          const compressedUri = await ImageCompressor.compressImage(originalUri);
+          console.log('🖼️ Compression complete:', compressedUri);
+          
+          setImage(compressedUri);
+          // Small delay to ensure file is ready and UI updates
+          setTimeout(() => processImage(compressedUri), 500);
+        } catch (error) {
+          console.error('Error handling gallery result:', error);
+          Alert.alert('Error', 'Failed to process image');
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -129,8 +154,23 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       return;
     }
 
+    if (!extractedData.billNumber) {
+      Alert.alert('Error', 'Bill number is missing. Please enter it manually.');
+      return;
+    }
+
     setProcessing(true);
     try {
+      // Check for duplicate bill
+      /*
+      const exists = await FirestoreService.checkBillExists(extractedData.billNumber);
+      if (exists) {
+        Alert.alert('Error', 'This bill number already exists in the system.');
+        setProcessing(false);
+        return;
+      }
+      */
+
       // Save bill to Firestore (without image upload)
       await FirestoreService.saveBill({
         userId: user.id,
@@ -173,7 +213,7 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </View>
         ) : (
           <>
-            <Image source={{ uri: image }} style={styles.image} />
+            {image && <Image source={{ uri: image }} style={styles.image} />}
             
             {processing && (
               <View style={styles.processingContainer}>

@@ -22,7 +22,16 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.jagrut.app",
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "metaData": {
+        "com.google.mlkit.vision.DEPENDENCIES": "ocr,barcode"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -42,6 +51,11 @@
       ],
       "onnxruntime-react-native",
       "./plugins/withOnnxManualLinking"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e94c04a0-f32e-4583-9f96-5eb766143d60"
+      }
+    }
   }
 }

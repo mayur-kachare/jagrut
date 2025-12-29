@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (phoneNumber: string, otp: string, name?: string, photoUrl?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   sendOTP: (phoneNumber: string) => Promise<boolean>;
+  updateUser: (userData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +32,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      setUser({ ...user, ...userData });
+    }
+  };
+
   const sendOTP = async (phoneNumber: string): Promise<boolean> => {
     return await AuthService.sendOTP(phoneNumber);
   };
@@ -50,7 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, sendOTP }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, sendOTP, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

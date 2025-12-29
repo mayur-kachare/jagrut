@@ -7,10 +7,25 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  Dimensions,
+  PixelRatio,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { FirestoreService } from '../services/firestore';
 import { Bill, ExpenseStats } from '../types';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const scale = SCREEN_WIDTH / 375; // Base width of 375 (iPhone X/11/12/13 Mini)
+
+const normalize = (size: number) => {
+  const newSize = size * scale;
+  if (Platform.OS === 'ios') {
+    return Math.round(PixelRatio.roundToNearestPixel(newSize));
+  } else {
+    return Math.round(PixelRatio.roundToNearestPixel(newSize)) - 2;
+  }
+};
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -54,7 +69,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const renderBillItem = ({ item }: { item: Bill }) => (
     <View style={styles.billCard}>
-      <Image source={{ uri: item.imageUrl }} style={styles.billImage} />
+      {item.imageUrl ? (
+        <Image source={{ uri: item.imageUrl }} style={styles.billImage} />
+      ) : (
+        <View style={[styles.billImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={{ fontSize: normalize(20) }}>📄</Text>
+        </View>
+      )}
       <View style={styles.billDetails}>
         <Text style={styles.billNumber}>Bill #{item.billNumber}</Text>
         <Text style={styles.billAmount}>₹{item.amount.toFixed(2)}</Text>
@@ -139,7 +160,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           style={styles.cameraButton}
           onPress={() => navigation.navigate('Camera')}
         >
-          <Text style={styles.cameraIcon}>📷</Text>
+          <Text style={styles.cameraIcon}>🧾</Text>
           <Text style={styles.cameraLabel}>Capture Bill</Text>
         </TouchableOpacity>
         {/* <TouchableOpacity
@@ -193,6 +214,7 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#000',
   },
   logoutButton: {
     padding: 8,
@@ -214,12 +236,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: 'bold',
     color: '#007AFF',
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: normalize(10),
     color: '#666',
     marginTop: 4,
   },
@@ -237,12 +259,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   accordionIcon: {
-    fontSize: 24,
+    fontSize: normalize(24),
     fontWeight: '600',
+    color: '#000',
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: normalize(16),
     fontWeight: 'bold',
+    color: '#000',
   },
   collapsedHint: {
     fontSize: 14,
@@ -252,38 +276,39 @@ const styles = StyleSheet.create({
   billCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 6,
-    marginBottom: 6,
+    padding: normalize(8),
+    marginBottom: normalize(8),
     flexDirection: 'row',
   },
   billImage: {
-    width: 40,
-    height: 40,
+    width: normalize(40),
+    height: normalize(40),
     borderRadius: 8,
   },
   billDetails: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: normalize(12),
     justifyContent: 'center',
   },
   billNumber: {
-    fontSize: 12,
+    fontSize: normalize(12),
     fontWeight: '600',
     marginBottom: 4,
+    color: '#000',
   },
   billAmount: {
-    fontSize: 14,
+    fontSize: normalize(14),
     fontWeight: 'bold',
     color: '#34C759',
     marginBottom: 4,
   },
   billRoute: {
-    fontSize: 14,
+    fontSize: normalize(14),
     color: '#666',
     marginBottom: 2,
   },
   billDate: {
-    fontSize: 12,
+    fontSize: normalize(12),
     color: '#999',
   },
   emptyContainer: {

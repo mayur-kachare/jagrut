@@ -13,6 +13,21 @@ import { Bill, ExpenseStats } from '../types';
 export class FirestoreService {
   private static readonly BILLS_COLLECTION = 'bills';
 
+  // Check if bill exists
+  static async checkBillExists(billNumber: string): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, this.BILLS_COLLECTION),
+        where('billNumber', '==', billNumber)
+      );
+      const querySnapshot = await getDocs(q);
+      return !querySnapshot.empty;
+    } catch (error) {
+      console.error('Error checking bill existence:', error);
+      return false;
+    }
+  }
+
   // Save bill to Firestore
   static async saveBill(bill: Omit<Bill, 'id' | 'createdAt'>): Promise<string> {
     try {

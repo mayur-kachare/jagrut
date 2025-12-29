@@ -16,7 +16,7 @@ import { AuthService } from '../services/auth';
 import { StorageService } from '../services/storage';
 
 export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [name, setName] = useState(user?.name || '');
   const [photoUrl, setPhotoUrl] = useState(user?.photoUrl || '');
   const [loading, setLoading] = useState(false);
@@ -104,6 +104,8 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
         name,
         photoUrl: finalPhotoUrl,
       });
+
+      updateUser({ name, photoUrl: finalPhotoUrl });
 
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
@@ -230,6 +232,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+    color: '#000',
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',
