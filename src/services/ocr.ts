@@ -1,4 +1,4 @@
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
 import BarcodeScanning, { BarcodeFormat } from '@react-native-ml-kit/barcode-scanning';
 import { Bill } from '../types';
 
@@ -42,10 +42,14 @@ export class OCRService {
       */
 
       // 2. Run OCR for text extraction (always needed for From/To)
-      console.log('🔍 Running ML Kit OCR...');
-      let result;
+      console.log('🔍 Running ML Kit OCR (Latin & Devanagari)...');
+      let text = '';
       try {
-         result = await TextRecognition.recognize(scanUri);
+         const [latinResult, devanagariResult] = await Promise.all([
+            TextRecognition.recognize(scanUri, TextRecognitionScript.LATIN),
+            TextRecognition.recognize(scanUri, TextRecognitionScript.DEVANAGARI),
+         ]);
+         text = [latinResult.text, devanagariResult.text].filter(Boolean).join('\n');
       } catch (ocrError) {
          console.error('❌ TextRecognition failed:', ocrError);
          // If OCR fails, but we have QR data, return that
@@ -55,7 +59,7 @@ export class OCRService {
          throw ocrError;
       }
 
-      if (!result || !result.text) {
+      if (!text) {
         console.log('⚠️ ML Kit returned no text.');
         // If we have QR data, return that at least
         if (Object.keys(qrData).length > 0) {
@@ -64,10 +68,13 @@ export class OCRService {
         return OCRService.getMockData();
       }
 
-      const text = result.text;
       console.log('📦 --- RAW OCR PAYLOAD START ---');
       console.log(text);
       console.log('📦 --- RAW OCR PAYLOAD END ---');
+
+      if (!OCRService.isValidPuneMetroTicket(text)) {
+        throw new Error("This is not a valid Pune Metro Ticket or the Image is not capturing CO2");
+      }
 
       const ocrData = OCRService.parseWithHeuristics(text);
       
@@ -85,8 +92,23 @@ export class OCRService {
 
     } catch (error: any) {
       console.error('❌ OCR Error:', error);
+      if (error.message === "This is not a valid Pune Metro Ticket or the Image is not capturing CO2") {
+        throw error;
+      }
       return OCRService.getMockData();
     }
+  }
+
+  private static isValidPuneMetroTicket(text: string): boolean {
+    const upper = text.toUpperCase();
+    // Must have Ticket Number identifier AND CO2 identifier
+    const hasTicketInfo = text.includes('तिकीट') ||
+           (upper.includes('TICKET NO') && upper.includes('JOURNEY TICKET'));
+           
+    // Added '০' to allowed middle chars, and 'CO' as fallback
+    const hasCO2 = /(?:C[O0o০]?|০০)2+|CO/i.test(text);
+
+    return hasTicketInfo && hasCO2;
   }
 
   private static parseQRData(rawValue: string): Partial<Bill> {
@@ -140,6 +162,7 @@ export class OCRService {
         if (floatMatch) amountVal = floatMatch[1];
     }
 
+    /*
     const locationCandidates = rawLines.filter(line => {
         const upper = line.toUpperCase();
         if (line !== upper) return false; 
@@ -152,6 +175,55 @@ export class OCRService {
 
     const fromVal = locationCandidates[0] || '';
     const toVal = locationCandidates[1] || '';
+    */
+    const fromVal = '';
+    const toVal = '';
+
+    // Extract CO2 saved
+    let co2Saved = '';
+    // Regex to capture number-like pattern before unit and CO2
+    // Matches:
+    // 1. Number part: digits, dots, spaces, Bengali 0 (০), Latin o/O (common OCR errors for 0), S/s (misread 5), Bengali 4 (৪ - misread 8)
+    // 2. Unit: g, gm, gram, ग्रेम, ग्रेंम, प्रेम (misread), प्रेंम (misread), प्रम (misread), grams, प्म (misread), ग्रॅम, ग्रॉम, ग्म, गप्रेम (misread), म्रेम (misread), परम (misread), ग्रेभ (misread), फम (misread), म (misread), ग\s*्रम (split across lines), टरेम (misread), प्रे\s*म (split)
+    // 3. CO2: C or 0/O/০, then optional O/0/০, then 2 (Handles "C2", "002", "০০2", "CO22" misreads) OR just "CO". Allows spaces.
+    // Added support for leading parenthesis '(' before CO2
+    // Added comma ',' to allowed chars in number part
+    const co2Regex = /([0-9০oO\s.Ss৪,]+)\s*(?:g|gm|gram|ग्रेम|ग्रेंम|प्रेम|प्रेंम|प्रम|प्म|ग्रॅम|ग्रॉम|ग्म|गप्रेम|म्रेम|परम|ग्रेभ|फम|म|grams|ग\s*्रम|টरेम|प्रे\s*म)\s*(?:\(?\s*[C0O০o]\s*[O0০o]?\s*2+|CO)/i;
+    const co2Match = text.match(co2Regex);
+    
+    if (co2Match) {
+        let rawNumber = co2Match[1];
+        // Clean up the number
+        // 1. Normalize characters (Bengali 0, o/O -> 0, S/s -> 5, Bengali 4 -> 8)
+        rawNumber = rawNumber
+            .replace(/০/g, '0')
+            .replace(/[oO]/gi, '0')
+            .replace(/[sS]/g, '5')
+            .replace(/৪/g, '8');
+
+        // 2. Handle spaces
+        if (rawNumber.includes('.')) {
+            // If dot exists, spaces are just noise (e.g. "0 . 59")
+            // Also remove commas which might be OCR noise near decimal (e.g. "1.,02")
+            rawNumber = rawNumber.replace(/,/g, '').replace(/\s/g, '');
+        } else {
+            // If no dot, treat the first whitespace sequence as a decimal point
+            // e.g. "0 59" -> "0.59", "0  59" -> "0.59"
+            rawNumber = rawNumber.trim().replace(/\s+/, '.').replace(/\s/g, '');
+        }
+            
+        // Verify it is a valid number
+        let co2Value = parseFloat(rawNumber);
+        if (!isNaN(co2Value)) {
+             // Validation: CO2 is typically small, but can be > 1g (e.g. 1.02g)
+             // Heuristic: If > 2, it's likely missing a decimal point (e.g. 59 -> 0.59)
+             while (co2Value > 2) {
+                 co2Value /= 10;
+             }
+             // Remove trailing zeros if needed, but toFixed(2) is standard
+             co2Saved = `${parseFloat(co2Value.toFixed(2))} g CO2`;
+        }
+    }
 
     // 3. Label Beautification & Reconstruction
     const labels = ['Date', 'From', 'To', 'Fare', 'Charge', 'Amount', 'Ticket', 'Tickat', 'Bill', 'Invoice'];
@@ -160,8 +232,8 @@ export class OCRService {
         const upper = line.toUpperCase();
         
         // If line is exactly one of our orphaned values, prefix it
-        if (line === fromVal) return `From : ${line}`;
-        if (line === toVal) return `To : ${line}`;
+        // if (line === fromVal) return `From : ${line}`;
+        // if (line === toVal) return `To : ${line}`;
         if (line === dateVal) return `Date : ${line}`;
         if (line === amountVal || (amountVal.includes(line) && line.length > 2)) return `Fare : ${line}`;
 
@@ -203,13 +275,41 @@ export class OCRService {
         dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
     }
 
+    let finalAmount = parseFloat(amountVal.replace(/[^0-9.]/g, '')) || 0;
+    
+    // Heuristic 1: If amount is 3 digits and starts with 2, the 2 is likely a misread '₹'
+    // e.g. 214.0 -> 14.0, 200.0 -> 0.0 (or 20.0 if it was 220.0)
+    if (finalAmount >= 200 && finalAmount < 300) {
+        finalAmount -= 200;
+    }
+
+    // Heuristic 2: If amount is > 100 (and wasn't caught by above), it's likely missing a decimal point
+    // Pune Metro fares are typically < 100. 
+    // e.g. 105 -> 10.5, 150 -> 15.0, 300 -> 30.0
+    if (finalAmount >= 100) {
+        finalAmount /= 10;
+    }
+
+    // Try to find specific Pune Metro long ID format first: YYYYMMDD T HHMM O XXXX
+    // e.g. 02251230T1100O0082
+    // Allow for spaces and common OCR misreads (0 for O)
+    const longIdMatch = text.match(/(\d{8}\s*T\s*\d{4}\s*[O0]\s*\d{4})/i);
+    let billNo = longIdMatch ? longIdMatch[1].replace(/\s/g, '').replace(/0(?=\d{4}$)/, 'O') : '';
+
+    if (!billNo) {
+        // Fallback to generic "Ticket No" search
+        // Added [-\/.] to allowed chars
+        billNo = text.match(/(?:Tick[ae]t|Bill|Invoice|तिकीट\s*क्र\.?)\s*(?:N0|No|#|Number)?\s*[:\-]?\s*([A-Z0-9:\-\/.]+)/i)?.[1] || '';
+    }
+
     return {
-      billNumber: text.match(/(?:Tick[ae]t|Bill|Invoice)\s*(?:N0|No|#|Number)?\s*[:\-]?\s*([A-Z0-9T]+)/i)?.[1] || `BILL${Date.now()}`,
-      amount: parseFloat(amountVal.replace(/[^0-9.]/g, '')) || 0,
+      billNumber: billNo || `BILL${Date.now()}`,
+      amount: finalAmount,
       date: dateObj,
       from: fromVal || 'Unknown',
       to: toVal || 'Unknown',
       extractedText: cleanedText,
+      co2Saved: co2Saved,
     };
   }
 

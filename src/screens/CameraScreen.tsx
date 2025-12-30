@@ -110,8 +110,8 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       // Extract text using OCR
       const data = await OCRService.extractTextFromImage(imageUri);
       setExtractedData(data);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to process image');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to process image');
       console.error(error);
     } finally {
       setProcessing(false);
@@ -147,9 +147,10 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         billNumber: extractedData.billNumber || '',
         amount: extractedData.amount || 0,
         date: extractedData.date || new Date(),
-        from: extractedData.from || '',
-        to: extractedData.to || '',
+        // from: extractedData.from || '',
+        // to: extractedData.to || '',
         extractedText: extractedData.extractedText,
+        co2Saved: extractedData.co2Saved,
       });
 
       Alert.alert('Success', 'Bill saved successfully!', [
@@ -199,9 +200,12 @@ export const CameraScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 <Text style={styles.dataText}>
                   Date : {extractedData.date?.toLocaleDateString() || '—'}
                 </Text>
-                <Text style={styles.dataText}>From : {extractedData.from || '—'}</Text>
-                <Text style={styles.dataText}>To : {extractedData.to || '—'}</Text>
+                {/* <Text style={styles.dataText}>From : {extractedData.from || '—'}</Text>
+                <Text style={styles.dataText}>To : {extractedData.to || '—'}</Text> */}
                 <Text style={styles.dataText}>Amount / Fare : ₹{extractedData.amount || '—'}</Text>
+                {extractedData.co2Saved && (
+                  <Text style={styles.dataText}>CO2 Saved : {extractedData.co2Saved}</Text>
+                )}
                 
                 {extractedData.extractedText && (
                   <View style={styles.rawTextContainer}>
@@ -292,11 +296,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    color: '#000',
   },
   dataText: {
     fontSize: 16,
     marginBottom: 8,
-    color: '#333',
+    color: '#000',
   },
   actionButtons: {
     flexDirection: 'row',

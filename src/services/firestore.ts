@@ -83,11 +83,22 @@ export class FirestoreService {
     // Mock distance calculation - implement based on from/to locations
     const totalDistance = billCount * 50; // Mock: 50km per bill
     
+    const totalCo2Saved = bills.reduce((sum, bill) => {
+      if (bill.co2Saved) {
+        const match = bill.co2Saved.match(/(\d+(?:\.\d+)?)/);
+        if (match) {
+          return sum + parseFloat(match[1]);
+        }
+      }
+      return sum;
+    }, 0);
+
     return {
       totalExpenses,
       totalDistance,
       averageExpense,
       billCount,
+      totalCo2Saved,
     };
   }
 }

@@ -12,11 +12,12 @@ export interface Bill {
   billNumber: string;
   amount: number;
   date: Date;
-  from: string;
-  to: string;
+  from?: string;
+  to?: string;
   imageUrl?: string;
   createdAt: Date;
   extractedText?: string;
+  co2Saved?: string;
 }
 
 export interface ExpenseStats {
@@ -24,6 +25,7 @@ export interface ExpenseStats {
   totalDistance: number;
   averageExpense: number;
   billCount: number;
+  totalCo2Saved: number;
 }
 
 export interface OTPVerification {

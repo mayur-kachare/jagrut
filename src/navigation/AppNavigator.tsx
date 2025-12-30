@@ -7,6 +7,8 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { CameraScreen } from '../screens/CameraScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { CO2SummaryScreen } from '../screens/CO2SummaryScreen';
+import { Bill } from '../types';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -14,6 +16,7 @@ export type RootStackParamList = {
   Camera: undefined;
   QRScanner: undefined;
   Profile: undefined;
+  CO2Summary: { bills: Bill[] };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -71,6 +74,13 @@ export const AppNavigator: React.FC = () => {
               options={{
                 headerShown: true,
                 title: 'Scan QR Code',
+              }}
+            />
+            <Stack.Screen
+              name="CO2Summary"
+              component={CO2SummaryScreen}
+              options={{
+                headerShown: false,
               }}
             />
           </>

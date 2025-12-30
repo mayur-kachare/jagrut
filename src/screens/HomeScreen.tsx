@@ -79,12 +79,17 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <View style={styles.billDetails}>
         <Text style={styles.billNumber}>Bill #{item.billNumber}</Text>
         <Text style={styles.billAmount}>₹{item.amount.toFixed(2)}</Text>
-        <Text style={styles.billRoute}>
+        {/* <Text style={styles.billRoute}>
           {item.from} → {item.to}
-        </Text>
+        </Text> */}
         <Text style={styles.billDate}>
           {item.date.toLocaleDateString()}
         </Text>
+        {item.co2Saved && (
+          <Text style={styles.billCo2}>
+            🌱 {item.co2Saved}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -115,16 +120,36 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       </View>
 
       {stats && (
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>₹{stats.totalExpenses.toFixed(0)}</Text>
-            <Text style={styles.statLabel}>Total Expenses</Text>
+        <>
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>₹{stats.totalExpenses.toFixed(0)}</Text>
+              <Text style={styles.statLabel}>Total Expenses</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{stats.billCount}</Text>
+              <Text style={styles.statLabel}>Bills</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>{stats.billCount}</Text>
-            <Text style={styles.statLabel}>Bills</Text>
+
+          <View style={styles.co2Container}>
+            <TouchableOpacity 
+              style={styles.co2Card}
+              onPress={() => {
+                // Convert dates to strings to avoid non-serializable warning
+                const serializableBills = bills.map(b => ({
+                  ...b,
+                  date: b.date instanceof Date ? b.date.toISOString() : b.date,
+                  createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
+                }));
+                navigation.navigate('CO2Summary', { bills: serializableBills });
+              }}
+            >
+              <Text style={styles.co2Value}>{stats.totalCo2Saved?.toFixed(2) || '0.00'} g</Text>
+              <Text style={styles.co2Label}>Total CO2 Saved 🌱</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </>
       )}
 
       <View style={[styles.section, showRecent && styles.sectionExpanded]}>
@@ -161,7 +186,7 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           onPress={() => navigation.navigate('Camera')}
         >
           <Text style={styles.cameraIcon}>🧾</Text>
-          <Text style={styles.cameraLabel}>Capture Bill</Text>
+          <Text style={styles.cameraLabel}>Record Saved{'\n'}CO2</Text>
         </TouchableOpacity>
         {/* <TouchableOpacity
           style={styles.cameraButton}
@@ -245,6 +270,29 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+  co2Container: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  co2Card: {
+    backgroundColor: '#E8F5E9', // Light green background
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  co2Value: {
+    fontSize: normalize(24),
+    fontWeight: 'bold',
+    color: '#2E7D32', // Dark green text
+  },
+  co2Label: {
+    fontSize: normalize(14),
+    color: '#388E3C',
+    marginTop: 4,
+    fontWeight: '500',
+  },
   section: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -311,6 +359,12 @@ const styles = StyleSheet.create({
     fontSize: normalize(12),
     color: '#999',
   },
+  billCo2: {
+    fontSize: normalize(12),
+    color: '#2E7D32',
+    marginTop: 2,
+    fontWeight: '500',
+  },
   emptyContainer: {
     padding: 40,
     alignItems: 'center',
@@ -328,10 +382,10 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   cameraButton: {
-    width: 96,
+    width: 140,
     height: 96,
     borderRadius: 24,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2E7D32', // Dark green to match CO2 saved
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
@@ -340,13 +394,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     gap: 8,
+    padding: 4,
   },
   cameraIcon: {
     fontSize: 26,
   },
   cameraLabel: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#fff',
     fontWeight: '600',
+    textAlign: 'center',
   },
 });
