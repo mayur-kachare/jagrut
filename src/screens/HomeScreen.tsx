@@ -7,7 +7,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
-  Dimensions,
+          <Text style={styles.cameraLabel}>Book Free{'\n'}Commute</Text>
   PixelRatio,
   Platform,
 } from 'react-native';
@@ -187,6 +187,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         >
           <Text style={styles.cameraIcon}>🧾</Text>
           <Text style={styles.cameraLabel}>Record Saved{'\n'}CO2</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.cameraButton, styles.transportButton]}
+          onPress={() => navigation.navigate('Camera')}
+        >
+          <Text style={styles.cameraIcon}>🚌</Text>
+          <Text style={styles.cameraLabel}>Book Free{'\n'}Commute</Text>
         </TouchableOpacity>
         {/* <TouchableOpacity
           style={styles.cameraButton}
@@ -395,6 +402,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     gap: 8,
     padding: 4,
+  },
+  transportButton: {
+    backgroundColor: '#1565C0', // Transport blue
   },
   cameraIcon: {
     fontSize: 26,
