@@ -1,9 +1,36 @@
-import TextRecognition, { TextRecognitionScript } from '@react-native-ml-kit/text-recognition';
-import BarcodeScanning, { BarcodeFormat } from '@react-native-ml-kit/barcode-scanning';
+import { Platform } from 'react-native';
+
+// Use conditional requires to prevent native modules from crashing the web bundler
+let TextRecognition: any = null;
+let TextRecognitionScript: any = {};
+let BarcodeScanning: any = null;
+let BarcodeFormat: any = {};
+
+if (Platform.OS !== 'web') {
+  try {
+    TextRecognition = require('@react-native-ml-kit/text-recognition').default;
+    TextRecognitionScript = require('@react-native-ml-kit/text-recognition').TextRecognitionScript;
+    BarcodeScanning = require('@react-native-ml-kit/barcode-scanning').default;
+    BarcodeFormat = require('@react-native-ml-kit/barcode-scanning').BarcodeFormat;
+  } catch (e) {
+    console.warn('⚠️ Native ML Kit modules failed to load:', e);
+  }
+}
+
 import { Bill } from '../types';
 
 export class OCRService {
   static async extractTextFromImage(imageUri: string): Promise<Partial<Bill>> {
+    if (Platform.OS === 'web') {
+      console.log('🌐 Web platform detected: Skipping native OCR and returning mock data.');
+      return OCRService.getMockData();
+    }
+
+    if (Platform.OS !== 'web' && !TextRecognition) {
+      console.error('❌ Native OCR modules are not linked correctly.');
+      return OCRService.getMockData();
+    }
+
     if (!imageUri) {
       return OCRService.getMockData();
     }
@@ -45,11 +72,18 @@ export class OCRService {
       console.log('🔍 Running ML Kit OCR (Latin & Devanagari)...');
       let text = '';
       try {
-         const [latinResult, devanagariResult] = await Promise.all([
-            TextRecognition.recognize(scanUri, TextRecognitionScript.LATIN),
-            TextRecognition.recognize(scanUri, TextRecognitionScript.DEVANAGARI),
-         ]);
-         text = [latinResult.text, devanagariResult.text].filter(Boolean).join('\n');
+        // Safeguard against missing native recognition module
+        if (!TextRecognition?.recognize) {
+          throw new Error('Native TextRecognition module is not available');
+        }
+
+        const [latinResult, devanagariResult] = await Promise.all([
+          TextRecognition.recognize(scanUri, TextRecognitionScript.LATIN),
+          // Catch Devanagari separately as it often fails if models aren't downloaded
+          TextRecognition.recognize(scanUri, TextRecognitionScript.DEVANAGARI).catch(() => ({ text: '' })),
+        ]);
+
+        text = [latinResult?.text, devanagariResult?.text].filter(Boolean).join('\n');
       } catch (ocrError) {
          console.error('❌ TextRecognition failed:', ocrError);
          // If OCR fails, but we have QR data, return that

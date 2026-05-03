@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+console.log(`🏁 App is starting on ${Platform.OS}...`);
 import 'react-native-gesture-handler';
 import { registerRootComponent } from 'expo';
 import { enableScreens } from 'react-native-screens';

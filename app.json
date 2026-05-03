@@ -6,11 +6,15 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_ERROR_RECOVERY"
     },
     "ios": {
       "supportsTablet": true,
@@ -49,8 +53,7 @@
           "photosPermission": "Allow Jagrut to access your photos to select bills."
         }
       ],
-      "onnxruntime-react-native",
-      "./plugins/withOnnxManualLinking"
+      "onnxruntime-react-native"
     ],
     "extra": {
       "eas": {
