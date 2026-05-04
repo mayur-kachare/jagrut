@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Alert,
   Image,
-  ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { AuthService } from '../services/auth';
@@ -20,6 +20,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
   const [name, setName] = useState(user?.name || '');
   const [photoUrl, setPhotoUrl] = useState(user?.photoUrl || '');
   const [loading, setLoading] = useState(false);
+  const [newAdminPassword, setNewAdminPassword] = useState('');
 
   const pickImage = () => {
     Alert.alert(
@@ -107,6 +108,15 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
 
       updateUser({ name, photoUrl: finalPhotoUrl });
 
+      if (user.role === 'admin' && newAdminPassword) {
+        if (newAdminPassword.length < 4) {
+          Alert.alert('Error', 'Admin password must be at least 4 characters');
+          setLoading(false);
+          return;
+        }
+        await AuthService.updateAdminPassword(newAdminPassword);
+      }
+
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
@@ -144,6 +154,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             style={[styles.input, styles.disabledInput]}
             value={user?.phoneNumber}
             editable={false}
+            placeholderTextColor="#000"
           />
 
           <Text style={styles.label}>Full Name</Text>
@@ -152,7 +163,22 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             placeholder="Enter your name"
             value={name}
             onChangeText={setName}
+            placeholderTextColor="#000"
           />
+
+          {user?.role === 'admin' && (
+            <>
+              <Text style={styles.label}>Change Admin Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="New Password (optional)"
+                value={newAdminPassword}
+                onChangeText={setNewAdminPassword}
+                secureTextEntry
+                placeholderTextColor="#000"
+              />
+            </>
+          )}
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}

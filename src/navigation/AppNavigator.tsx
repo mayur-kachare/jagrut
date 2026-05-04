@@ -8,6 +8,10 @@ import { CameraScreen } from '../screens/CameraScreen';
 import { QRScannerScreen } from '../screens/QRScannerScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { CO2SummaryScreen } from '../screens/CO2SummaryScreen';
+import { AdminDashboardScreen } from '../screens/AdminDashboardScreen';
+import { AdminCompanyProfileScreen } from '../screens/AdminCompanyProfileScreen';
+import { AdminUserManagementScreen } from '../screens/AdminUserManagementScreen';
+import { AdminCouponManagementScreen } from '../screens/AdminCouponManagementScreen';
 import { Bill } from '../types';
 
 export type RootStackParamList = {
@@ -16,6 +20,10 @@ export type RootStackParamList = {
   Camera: undefined;
   QRScanner: undefined;
   Profile: undefined;
+  AdminDashboard: undefined;
+  AdminCompanyProfile: undefined;
+  AdminUserManagement: undefined;
+  AdminCouponManagement: undefined;
   CO2Summary: { bills: Bill[] };
 };
 
@@ -46,13 +54,49 @@ export const AppNavigator: React.FC = () => {
           />
         ) : (
           <>
-            <Stack.Screen
-              name="Home"
-              component={HomeScreen}
-              options={{
-                headerShown: false,
-              }}
-            />
+            {user.role === 'admin' ? (
+              <>
+                <Stack.Screen
+                  name="AdminDashboard"
+                  component={AdminDashboardScreen}
+                  options={{
+                    title: 'Admin Dashboard',
+                    headerLeft: () => null, // Prevent back button on landing page
+                  }}
+                />
+                <Stack.Screen name="AdminCompanyProfile" component={AdminCompanyProfileScreen} options={{ title: 'Company Profile' }} />
+                <Stack.Screen name="AdminUserManagement" component={AdminUserManagementScreen} options={{ title: 'User Management' }} />
+                <Stack.Screen name="AdminCouponManagement" component={AdminCouponManagementScreen} options={{ title: 'Coupon Management' }} />
+              </>
+            ) : (
+              <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+            )}
+
+            {/* Also keep the non-landing screens available */}
+            {user.role === 'admin' ? (
+              <Stack.Screen
+                name="Home"
+                component={HomeScreen}
+                options={{
+                  headerShown: false,
+                }}
+              />
+            ) : (
+              <Stack.Screen
+                name="AdminDashboard"
+                component={AdminDashboardScreen}
+                options={{
+                  title: 'Admin Dashboard',
+                }}
+              />
+            )}
+            
             <Stack.Screen
               name="Profile"
               component={ProfileScreen}
@@ -60,6 +104,7 @@ export const AppNavigator: React.FC = () => {
                 title: 'Edit Profile',
               }}
             />
+
             <Stack.Screen
               name="Camera"
               component={CameraScreen}

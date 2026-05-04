@@ -7,9 +7,9 @@ import {
   Image,
   Alert,
   ActivityIndicator,
-  ScrollView,
   Linking,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { OCRService } from '../services/ocr';
 import { FirestoreService } from '../services/firestore';

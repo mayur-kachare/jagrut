@@ -10,17 +10,25 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { AuthService } from '../services/auth';
 
 export const LoginScreen: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [otp, setOtp] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
+  const [step, setStep] = useState<'phone' | 'adminPassword' | 'otp'>('phone');
   const [loading, setLoading] = useState(false);
   const { login, sendOTP } = useAuth();
 
   const handleSendOTP = async () => {
-    if (phoneNumber.length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number');
+    const isAdmin = phoneNumber.toLowerCase().trim() === 'admin';
+    if (!isAdmin && phoneNumber.length < 3) {
+      Alert.alert('Error', 'Enter valid username or mobile number');
+      return;
+    }
+
+    if (isAdmin) {
+      setStep('adminPassword');
       return;
     }
 
@@ -28,8 +36,32 @@ export const LoginScreen: React.FC = () => {
     try {
       const success = await sendOTP(phoneNumber);
       if (success) {
-        setOtpSent(true);
+        setStep('otp');
         Alert.alert('Success', 'OTP sent successfully! (Use 123456)');
+      } else {
+        Alert.alert('Error', 'Failed to send OTP');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyAdminPassword = async () => {
+    setLoading(true);
+    try {
+      const isValid = await AuthService.verifyAdminPassword(adminPassword);
+      if (!isValid) {
+        Alert.alert('Error', 'Invalid Admin Password');
+        setLoading(false);
+        return;
+      }
+
+      const success = await sendOTP(phoneNumber);
+      if (success) {
+        setStep('otp');
+        Alert.alert('Success', 'OTP sent to Admin Mobile! (Use 123456)');
       } else {
         Alert.alert('Error', 'Failed to send OTP');
       }
@@ -69,28 +101,62 @@ export const LoginScreen: React.FC = () => {
         <Text style={styles.subtitle}>Bill Management & Analytics</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Phone Number</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+91 1234567890"
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            keyboardType="phone-pad"
-            editable={!otpSent}
-            underlineColorAndroid="transparent"
-          />
+          {step === 'phone' && (
+            <>
 
-          {!otpSent ? (
-            <TouchableOpacity
-              style={[styles.button, loading && styles.buttonDisabled]}
-              onPress={handleSendOTP}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? 'Sending...' : 'Send OTP'}
-              </Text>
-            </TouchableOpacity>
-          ) : (
+              <TextInput
+                style={styles.input}
+                placeholder="Username or Mobile No"
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="default"
+                autoCapitalize="none"
+                underlineColorAndroid="transparent"
+                placeholderTextColor="#000"
+              />
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleSendOTP}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Processing...' : 'Next'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'adminPassword' && (
+            <>
+              <Text style={styles.label}>Admin Password</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter Admin Password"
+                value={adminPassword}
+                onChangeText={setAdminPassword}
+                secureTextEntry
+                underlineColorAndroid="transparent"
+                placeholderTextColor="#000"
+              />
+              <TouchableOpacity
+                style={[styles.button, loading && styles.buttonDisabled]}
+                onPress={handleVerifyAdminPassword}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Verifying...' : 'Verify Password'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={() => setStep('phone')}
+              >
+                <Text style={styles.resendText}>Go Back</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {step === 'otp' && (
             <>
               <Text style={styles.label}>Enter OTP</Text>
               <TextInput
@@ -101,6 +167,7 @@ export const LoginScreen: React.FC = () => {
                 keyboardType="number-pad"
                 maxLength={6}
                 underlineColorAndroid="transparent"
+                placeholderTextColor="#000"
               />
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -113,7 +180,7 @@ export const LoginScreen: React.FC = () => {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.resendButton}
-                onPress={() => setOtpSent(false)}
+                onPress={() => setStep('phone')}
               >
                 <Text style={styles.resendText}>Change Number</Text>
               </TouchableOpacity>

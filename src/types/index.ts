@@ -3,6 +3,7 @@ export interface User {
   phoneNumber: string;
   name?: string;
   photoUrl?: string;
+  role?: 'admin' | 'user';
   createdAt: Date;
 }
 
@@ -26,6 +27,9 @@ export interface ExpenseStats {
   averageExpense: number;
   billCount: number;
   totalCo2Saved: number;
+  totalCoupons: number;
+  redeemedCoupons: number;
+  openCoupons: number;
 }
 
 export interface OTPVerification {

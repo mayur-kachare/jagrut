@@ -6,12 +6,12 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
   Linking,
   Dimensions,
   SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { useAuth } from '../context/AuthContext';
 import { FirestoreService } from '../services/firestore';

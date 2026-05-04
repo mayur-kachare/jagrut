@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
   Image,
   RefreshControl,
   PixelRatio,
@@ -12,9 +11,12 @@ import {
   Dimensions,
   Animated,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { ScrollView } from "react-native-gesture-handler";
 import { useAuth } from "../context/AuthContext";
 import { FirestoreService } from "../services/firestore";
+import { AuthService } from "../services/auth";
 import { Bill, ExpenseStats } from "../types";
 import { Accelerometer } from "expo-sensors";
 
@@ -39,25 +41,27 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [stats, setStats] = useState<ExpenseStats | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userCoupons, setUserCoupons] = useState<any[]>([]);
+  const [showCoupons, setShowCoupons] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
 
-  // --- Ball Game Physics State ---
-  const ballXY = useRef(new Animated.ValueXY({ x: SCREEN_WIDTH / 2 - BALL_RADIUS, y: 100 })).current;
-  const ballScale = useRef(new Animated.Value(1)).current;
-  
-  const rootLayout = useRef({ width: SCREEN_WIDTH, height: Dimensions.get("window").height });
-  const cameraContainerY = useRef(0);
-  const buttonLayout = useRef({ x: 0, y: 0, width: 0, height: 0 });
-
-  const px = useRef(SCREEN_WIDTH / 2);
-  const py = useRef(100);
+  // Refs for ball animation and layout
   const vx = useRef(0);
   const vy = useRef(0);
+  const px = useRef(SCREEN_WIDTH / 2);
+  const py = useRef(Dimensions.get("window").height / 2);
+  const ballXY = useRef(new Animated.ValueXY({ x: px.current - BALL_RADIUS, y: py.current - BALL_RADIUS })).current;
+  const ballScale = useRef(new Animated.Value(1)).current;
   const triggered = useRef(false);
+  const rootLayout = useRef({ width: 0, height: 0, x: 0, y: 0 });
+  const buttonLayout = useRef({ width: 0, height: 0, x: 0, y: 0 });
+  const cameraContainerY = useRef(0);
 
   useEffect(() => {
     loadData();
+  }, [user]);
 
+  useEffect(() => {
     // Setup Accelerometer for ball
     triggered.current = false;
     Accelerometer.setUpdateInterval(16);
@@ -137,16 +141,29 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   }, []);
 
   const loadData = async () => {
-    if (!user) return;
+    console.log("loadData triggered for user:", user?.id);
+    if (!user) {
+      console.log("No user found, returning early");
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     try {
-      const [userBills, expenseStats] = await Promise.all([
-        FirestoreService.getUserBills(user.id),
-        FirestoreService.getExpenseStats(user.id),
-      ]);
+      console.log("Fetching bills...");
+      const userBills = await FirestoreService.getUserBills(user.id);
+      
+      console.log("Checking/Generating coupons...");
+      await FirestoreService.checkAndGenerateCoupon(user.id);
+      
+      console.log("Fetching finalized stats and coupons...");
+      const expenseStats = await FirestoreService.getExpenseStats(user.id);
+      const coupons = await AuthService.getUserGeneratedCoupons(user.id);
 
+      console.log("Data fetched successfully. Bills:", userBills.length, "Stats Coupons:", expenseStats.totalCoupons);
       setBills(userBills);
       setStats(expenseStats);
+      setUserCoupons(coupons);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -185,9 +202,6 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <View style={styles.billDetails}>
         <Text style={styles.billNumber}>Bill #{item.billNumber}</Text>
         <Text style={styles.billAmount}>₹{item.amount.toFixed(2)}</Text>
-        {/* <Text style={styles.billRoute}>
-          {item.from} → {item.to}
-        </Text> */}
         <Text style={styles.billDate}>{item.date.toLocaleDateString()}</Text>
         {item.co2Saved && (
           <Text style={styles.billCo2}>🌱 {item.co2Saved}</Text>
@@ -224,6 +238,11 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.greeting}>
               Hello, {user?.name || "User"}! 👋
             </Text>
+            {user?.role === 'admin' && (
+              <TouchableOpacity onPress={() => navigation.navigate("AdminDashboard")}>
+                <Text style={{color: '#007AFF', fontSize: 14, marginTop: 4, fontWeight: 'bold'}}>Go to Admin Dashboard →</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
@@ -231,92 +250,143 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {stats && (
-        <>
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                ₹{stats.totalExpenses.toFixed(0)}
-              </Text>
-              <Text style={styles.statLabel}>Total Expenses</Text>
-            </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.billCount}</Text>
-              <Text style={styles.statLabel}>Bills</Text>
-            </View>
-          </View>
-
-          <View style={styles.co2Container}>
-            <TouchableOpacity
-              style={styles.co2Card}
-              onPress={() => {
-                // Convert dates to strings to avoid non-serializable warning
-                const serializableBills = bills.map((b) => ({
-                  ...b,
-                  date: b.date instanceof Date ? b.date.toISOString() : b.date,
-                  createdAt:
-                    b.createdAt instanceof Date
-                      ? b.createdAt.toISOString()
-                      : b.createdAt,
-                }));
-                navigation.navigate("CO2Summary", { bills: serializableBills });
-              }}
-            >
-              <Text style={styles.co2Value}>
-                {stats.totalCo2Saved?.toFixed(2) || "0.00"} g
-              </Text>
-              <Text style={styles.co2Label}>Total CO2 Saved 🌱</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-
-      <View style={[styles.section, showRecent && styles.sectionExpanded]}>
-        <TouchableOpacity
-          style={styles.accordionHeader}
-          onPress={() => setShowRecent((prev) => !prev)}
-        >
-          <Text style={styles.sectionTitle}>Recent Bills</Text>
-          <Text style={styles.accordionIcon}>{showRecent ? "−" : "+"}</Text>
-        </TouchableOpacity>
-
-        {showRecent ? (
-          <FlatList
-            data={bills}
-            renderItem={renderBillItem}
-            keyExtractor={(item) => item.id}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  No bills yet. Tap the camera button to add one!
-                </Text>
-              </View>
-            }
-          />
-        ) : null}
-      </View>
-
-      {/* Restored Camera Button Container */}
-      <View 
-        style={styles.cameraContainer}
-        onLayout={(e) => {
-          cameraContainerY.current = e.nativeEvent.layout.y;
-        }}
+      <ScrollView 
+        style={{ flex: 1 }} 
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <TouchableOpacity
-          style={styles.cameraButton}
-          onPress={() => Alert.alert("Play to Record", "Drop the Ball to the Button")}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>
+              ₹{(stats?.totalExpenses || 0).toFixed(0)}
+            </Text>
+            <Text style={styles.statLabel}>Total Expenses</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats?.billCount || 0}</Text>
+            <Text style={styles.statLabel}>Bills</Text>
+          </View>
+        </View>
+
+        <View style={styles.co2Container}>
+          <TouchableOpacity
+            style={styles.co2Card}
+            onPress={() => {
+              const serializableBills = bills.map((b) => ({
+                ...b,
+                date: b.date instanceof Date ? b.date.toISOString() : b.date,
+                createdAt:
+                  b.createdAt instanceof Date
+                    ? b.createdAt.toISOString()
+                    : b.createdAt,
+              }));
+              navigation.navigate("CO2Summary", { bills: serializableBills });
+            }}
+          >
+            <Text style={styles.co2Value}>
+              {stats?.totalCo2Saved?.toFixed(2) || "0.00"} g
+            </Text>
+            <Text style={styles.co2Label}>Total CO2 Saved 🌱</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.section, showRecent && styles.sectionExpanded]}>
+          <TouchableOpacity
+            style={styles.accordionHeader}
+            onPress={() => setShowRecent((prev) => !prev)}
+          >
+            <Text style={styles.sectionTitle}>Recent Bills</Text>
+            <Text style={styles.accordionIcon}>{showRecent ? "−" : "+"}</Text>
+          </TouchableOpacity>
+
+          {showRecent ? (
+            <View>
+              {bills.length > 0 ? (
+                bills.map((item) => <View key={item.id}>{renderBillItem({ item })}</View>)
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    No bills yet. Tap the camera button to add one!
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : null}
+        </View>
+
+        <View 
+          style={styles.cameraContainer}
           onLayout={(e) => {
-             buttonLayout.current = e.nativeEvent.layout;
+            cameraContainerY.current = e.nativeEvent.layout.y;
           }}
         >
-          <Text style={styles.cameraIcon}>🧾</Text>
-          <Text style={styles.cameraLabel}>Record Saved{"\n"}CO2</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={() => Alert.alert("Play to Record", "Drop the Ball to the Button")}
+            onLayout={(e) => {
+               buttonLayout.current = e.nativeEvent.layout;
+            }}
+          >
+            <Text style={styles.cameraIcon}>🧾</Text>
+            <Text style={styles.cameraLabel}>Record Saved{"\n"}CO2</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.rewardsSummaryContainer}>
+          <TouchableOpacity 
+            style={styles.rewardsCard}
+            onPress={() => setShowCoupons(!showCoupons)}
+          >
+            <View style={styles.rewardsHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={styles.rewardsTitle}>🎁 Rewards Summary</Text>
+                {userCoupons.length > 0 && <Text style={styles.totalCouponsBadge}>{stats?.totalCoupons || 0} Total</Text>}
+              </View>
+              <Text style={styles.accordionIcon}>{showCoupons ? "−" : "+"}</Text>
+            </View>
+            
+            <View style={styles.rewardsRow}>
+              <View style={styles.rewardStat}>
+                <Text style={[styles.rewardStatValue, { color: '#34C759' }]}>
+                  {stats?.redeemedCoupons || 0}
+                </Text>
+                <Text style={styles.rewardStatLabel}>Redeemed</Text>
+              </View>
+              <View style={styles.rewardDivider} />
+              <View style={styles.rewardStat}>
+                <Text style={[styles.rewardStatValue, { color: '#FF9500' }]}>
+                  {stats?.openCoupons || 0}
+                </Text>
+                <Text style={styles.rewardStatLabel}>Open</Text>
+              </View>
+            </View>
+
+            {showCoupons && userCoupons.length > 0 && (
+              <View style={styles.integratedCouponList}>
+                <View style={styles.integratedDivider} />
+                <Text style={styles.integratedSubTitle}>Available Coupons:</Text>
+                {userCoupons.map((coupon) => (
+                  <View key={coupon.id} style={styles.integratedCouponItem}>
+                    <Text style={styles.integratedCouponCode}>{coupon.code}</Text>
+                    <Text style={styles.integratedCouponDate}>
+                      Earned: {new Date(coupon.createdAt.toDate ? coupon.createdAt.toDate() : coupon.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))}
+                <Text style={styles.couponHint}>Use these codes in the reward partner app!</Text>
+              </View>
+            )}
+            
+            {showCoupons && userCoupons.length === 0 && (
+              <View style={{ marginTop: 16, alignItems: 'center' }}>
+                <Text style={{ color: '#666', fontStyle: 'italic' }}>No coupons earned yet. Keep saving CO2!</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+        
+        {/* Padding for ball space */}
+        <View style={{ height: 100 }} />
+      </ScrollView>
 
       {/* Global Ball Overlay */}
       <Animated.View
@@ -391,18 +461,20 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: "#fff",
-    padding: 8,
-    borderRadius: 12,
+    backgroundColor: "#E8F5E9",
+    padding: 12,
+    borderRadius: 16,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#C8E6C9",
   },
   statValue: {
-    fontSize: normalize(14),
+    fontSize: normalize(16),
     fontWeight: "bold",
     color: "#007AFF",
   },
   statLabel: {
-    fontSize: normalize(10),
+    fontSize: normalize(12),
     color: "#666",
     marginTop: 4,
   },
@@ -429,6 +501,94 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "500",
   },
+  rewardsSummaryContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  rewardsCard: {
+    backgroundColor: "#E8F5E9",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#C8E6C9",
+  },
+  rewardsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#C8E6C9',
+    paddingBottom: 8,
+  },
+  rewardsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalCouponsBadge: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    backgroundColor: '#E1F5FE',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rewardsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  rewardStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  rewardStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 2,
+  },
+  rewardStatLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  rewardDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#C8E6C9',
+  },
+  integratedCouponList: {
+    marginTop: 16,
+    paddingTop: 8,
+  },
+  integratedDivider: {
+    height: 1,
+    backgroundColor: '#C8E6C9',
+    marginBottom: 12,
+  },
+  integratedSubTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  integratedCouponItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(200, 230, 201, 0.5)',
+  },
+  integratedCouponCode: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    letterSpacing: 0.5,
+  },
+  integratedCouponDate: {
+    fontSize: 11,
+    color: '#777',
+    marginTop: 2,
+  },
   section: {
     paddingHorizontal: 16,
     paddingBottom: 16,
@@ -442,15 +602,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
   },
-  accordionIcon: {
-    fontSize: normalize(24),
-    fontWeight: "600",
-    color: "#000",
-  },
   sectionTitle: {
     fontSize: normalize(16),
     fontWeight: "bold",
     color: "#000",
+  },
+  accordionIcon: {
+    fontSize: normalize(20),
+    fontWeight: "600",
+    color: "#007AFF",
   },
   collapsedHint: {
     fontSize: 14,
@@ -556,6 +716,42 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.8,
     shadowRadius: 6,
     elevation: 8,
+  },
+  couponSection: {
+    backgroundColor: '#E8F5E9',
+    marginHorizontal: 16,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
+  },
+  couponList: {
+    padding: 16,
+    backgroundColor: 'transparent',
+  },
+  couponItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#C8E6C9',
+  },
+  couponCode: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    letterSpacing: 1,
+  },
+  couponDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  couponHint: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
+    marginTop: 12,
+    textAlign: 'center',
   },
 });
 
