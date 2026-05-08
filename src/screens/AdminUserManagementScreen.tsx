@@ -76,7 +76,7 @@ export const AdminUserManagementScreen: React.FC = () => {
             value={newUserPhone}
             onChangeText={setNewUserPhone}
             editable={!editingUserId}
-            placeholderTextColor="#000"
+            placeholderTextColor="#999"
           />
           <TextInput
             style={styles.input}
@@ -84,7 +84,7 @@ export const AdminUserManagementScreen: React.FC = () => {
             value={newUserPassword}
             onChangeText={setNewUserPassword}
             secureTextEntry={false}
-            placeholderTextColor="#000"
+            placeholderTextColor="#999"
           />
           
           <View style={styles.roleContainer}>
@@ -134,7 +134,7 @@ export const AdminUserManagementScreen: React.FC = () => {
             placeholder="Search users..."
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholderTextColor="#000"
+            placeholderTextColor="#999"
           />
 
           {fetching ? (
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, color: '#333' },
   section: { backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3, marginBottom: 24 },
   sectionSubtitle: { fontSize: 18, fontWeight: '600', marginBottom: 16, color: '#007AFF' },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 12, backgroundColor: '#fafafa', color: '#000' },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 12, backgroundColor: '#fafafa', color: '#555', fontWeight: '400' },
   disabledInput: { backgroundColor: '#eee', color: '#666' },
   roleContainer: { marginBottom: 20 },
   roleLabel: { fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' },

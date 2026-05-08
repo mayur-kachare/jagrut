@@ -154,7 +154,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             style={[styles.input, styles.disabledInput]}
             value={user?.phoneNumber}
             editable={false}
-            placeholderTextColor="#000"
+            placeholderTextColor="#999"
           />
 
           <Text style={styles.label}>Full Name</Text>
@@ -163,7 +163,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
             placeholder="Enter your name"
             value={name}
             onChangeText={setName}
-            placeholderTextColor="#000"
+            placeholderTextColor="#999"
           />
 
           {user?.role === 'admin' && (
@@ -175,7 +175,7 @@ export const ProfileScreen: React.FC<{ navigation: any }> = ({ navigation }) => 
                 value={newAdminPassword}
                 onChangeText={setNewAdminPassword}
                 secureTextEntry
-                placeholderTextColor="#000"
+                placeholderTextColor="#999"
               />
             </>
           )}
@@ -258,7 +258,8 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
-    color: '#000',
+    color: '#555',
+    fontWeight: '400',
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',

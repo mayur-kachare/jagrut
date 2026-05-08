@@ -41,6 +41,21 @@ const ENV_MESSAGES = [
   "Small changes in how we travel lead to big changes for our planet. 🔄",
   "Did you know? One metro trip can save over 500g of CO2. You're doing amazing! ✨",
   "Sustainability looks good on you! Keep saving, keep shining. 🌟",
+  "Your commute is carbon-lite and planet-bright. Great job! 🌈",
+  "Every kilometer on the metro is a kilometer for a healthier Earth. 🛣️",
+  "You're reducing urban congestion and carbon emissions. Double win! 🚦",
+  "Your green steps today are paving the way for a blue sky tomorrow. ☁️",
+  "Choosing the metro is a direct vote for a sustainable future. 🗳️",
+  "Keep the momentum going! Your environmental impact is inspiring. 🚀",
+  "One less car on the road means more space for nature. 🌿",
+  "Your CO2 savings are stacking up. You're building a greener legacy! 🧱",
+  "Pure air starts with pure choices. Thank you for choosing green! 💎",
+  "Every ride counts. Every gram matters. You matter. 💖",
+  "Be the change you want to see. Your commute is the perfect start. 🕯️",
+  "Green travel is a habit that keeps the planet healthy. 🍎",
+  "Your conscious choices are the seeds of a sustainable world. 🌻",
+  "Save CO2, earn rewards, and help the Earth. It's that simple! 🍭",
+  "Together, we can cool down the planet. One ride at a time. ❄️",
 ];
 
 const TUTORIAL_STEPS = [
@@ -77,6 +92,12 @@ const normalize = (size: number) => {
 
 const BALL_SIZE = 30;
 const BALL_RADIUS = BALL_SIZE / 2;
+
+const OBSTACLES = [
+  { id: 'car', icon: '🚗', relX: -85, relY: -60, size: 32 },
+  { id: 'bike', icon: '🏍️', relX: 85, relY: -60, size: 32 },
+  { id: 'suv', icon: '🚙', relX: 0, relY: 65, size: 32 },
+];
 
 export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { user, logout } = useAuth();
@@ -132,8 +153,8 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     triggered.current = false;
     Accelerometer.setUpdateInterval(16);
     const sub = Accelerometer.addListener(({ x, y }) => {
-      vx.current = vx.current * 0.8 + (-x) * 2;
-      vy.current = vy.current * 0.8 + y * 2;
+      vx.current = vx.current * 0.8 + (-x) * 1.6;
+      vy.current = vy.current * 0.8 + y * 1.6;
     });
 
     let rafId: ReturnType<typeof requestAnimationFrame>;
@@ -149,13 +170,13 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       const minY = SH * 0.1 + BALL_RADIUS;
       const maxY = SH * 0.9 - BALL_RADIUS;
 
-      if (px.current < minX) { px.current = minX; vx.current = Math.abs(vx.current) * 0.55; }
-      if (px.current > maxX) { px.current = maxX; vx.current = -Math.abs(vx.current) * 0.55; }
-      if (py.current < minY) { py.current = minY; vy.current = Math.abs(vy.current) * 0.55; }
-      if (py.current > maxY) { py.current = maxY; vy.current = -Math.abs(vy.current) * 0.55; }
+      if (px.current < minX) { px.current = minX; vx.current = Math.abs(vx.current) * 0.5; }
+      if (px.current > maxX) { px.current = maxX; vx.current = -Math.abs(vx.current) * 0.5; }
+      if (py.current < minY) { py.current = minY; vy.current = Math.abs(vy.current) * 0.5; }
+      if (py.current > maxY) { py.current = maxY; vy.current = -Math.abs(vy.current) * 0.5; }
 
-      vx.current *= 0.978;
-      vy.current *= 0.978;
+      vx.current *= 0.965;
+      vy.current *= 0.965;
 
       ballXY.setValue({ x: px.current - BALL_RADIUS, y: py.current - BALL_RADIUS });
 
@@ -169,13 +190,31 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         const dy = py.current - by;
         const dist = Math.hypot(dx, dy);
         
-        // Magnetic pull when close
-        if (dist < 100) {
-          vx.current -= dx * 0.05;
-          vy.current -= dy * 0.05;
+        // Obstacle collision detection
+        OBSTACLES.forEach((obs) => {
+          const obsX = bx + obs.relX;
+          const obsY = by + obs.relY;
+          const obsDx = px.current - obsX;
+          const obsDy = py.current - obsY;
+          const obsDist = Math.hypot(obsDx, obsDy);
+          
+          if (obsDist < (BALL_RADIUS + obs.size / 2)) {
+            // Collision! Simple bounce back
+            const bounceAngle = Math.atan2(obsDy, obsDx);
+            vx.current = Math.cos(bounceAngle) * 4;
+            vy.current = Math.sin(bounceAngle) * 4;
+            px.current = obsX + Math.cos(bounceAngle) * (BALL_RADIUS + obs.size / 2 + 1);
+            py.current = obsY + Math.sin(bounceAngle) * (BALL_RADIUS + obs.size / 2 + 1);
+          }
+        });
+
+        // Magnetic pull only when very close to center
+        if (dist < 40) {
+          vx.current -= dx * 0.08;
+          vy.current -= dy * 0.08;
         }
 
-        if (dist < 40) { // Increased radius for better accessibility
+        if (dist < 25) { // Smaller trigger radius
           triggered.current = true;
           Animated.spring(ballScale, {
             toValue: 0,
@@ -326,33 +365,73 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.motivationalText}>{randomMessage}</Text>
         </View>
 
-        <View style={styles.trainContainer}>
-          <View style={styles.trainCompartment}>
-            <Text style={styles.trainValue}>₹{(stats?.totalExpenses || 0).toFixed(0)}</Text>
-            <Text style={styles.trainLabel}>Expenses</Text>
+        <View style={styles.trainWrapper}>
+          <View style={styles.trainContainer}>
+            {/* Compartment 2 - Bills */}
+            <View style={styles.trainCompartment}>
+              <View style={styles.compartmentTop} />
+              <View style={styles.windowRow}>
+                <View style={styles.smallWindow} />
+                <View style={styles.smallWindow} />
+              </View>
+              <View style={styles.stripeContainer}>
+                <View style={styles.trainStripe} />
+              </View>
+              <Text style={styles.trainValue}>{stats?.billCount || 0}</Text>
+              <Text style={styles.trainLabel}>Bills</Text>
+            </View>
+
+            <View style={styles.trainConnector} />
+
+            {/* Compartment 1 - Expenses */}
+            <View style={styles.trainCompartment}>
+              <View style={styles.compartmentTop} />
+              <View style={styles.windowRow}>
+                <View style={styles.smallWindow} />
+                <View style={styles.smallWindow} />
+              </View>
+              <View style={styles.stripeContainer}>
+                <View style={styles.trainStripe} />
+              </View>
+              <Text style={styles.trainValue}>₹{(stats?.totalExpenses || 0).toFixed(0)}</Text>
+              <Text style={styles.trainLabel}>Expenses</Text>
+            </View>
+
+            <View style={styles.trainConnector} />
+
+            {/* Engine - Front (Right) */}
+            <TouchableOpacity 
+              style={[styles.trainCompartment, styles.trainEngine]}
+              onPress={() => {
+                const serializableBills = bills.map((b) => ({
+                  ...b,
+                  date: b.date instanceof Date ? b.date.toISOString() : b.date,
+                  createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
+                }));
+                navigation.navigate("CO2Summary", { bills: serializableBills });
+              }}
+            >
+              <View style={styles.engineTop} />
+              <View style={styles.engineCab}>
+                <View style={styles.engineWindow} />
+              </View>
+              <View style={styles.stripeContainer}>
+                <View style={styles.trainStripe} />
+              </View>
+              <Text style={styles.trainValue}>{stats?.totalCo2Saved?.toFixed(1) || "0"} g</Text>
+              <Text style={[styles.trainLabel, { fontSize: 8 }]}>CO2 Saved</Text>
+              <View style={styles.engineHeadlight} />
+            </TouchableOpacity>
           </View>
-          <View style={styles.trainConnector} />
-          <View style={styles.trainCompartment}>
-            <Text style={styles.trainValue}>{stats?.billCount || 0}</Text>
-            <Text style={styles.trainLabel}>Bills</Text>
+          <View style={styles.trainTrackContainer}>
+            <View style={styles.sleeperContainer}>
+              {[...Array(12)].map((_, i) => (
+                <View key={i} style={styles.sleeper} />
+              ))}
+            </View>
+            <View style={styles.railLine} />
+            <View style={[styles.railLine, { marginTop: 4 }]} />
           </View>
-          <View style={styles.trainConnector} />
-          <TouchableOpacity 
-            style={[styles.trainCompartment, styles.trainEngine]}
-            onPress={() => {
-              const serializableBills = bills.map((b) => ({
-                ...b,
-                date: b.date instanceof Date ? b.date.toISOString() : b.date,
-                createdAt: b.createdAt instanceof Date ? b.createdAt.toISOString() : b.createdAt,
-              }));
-              navigation.navigate("CO2Summary", { bills: serializableBills });
-            }}
-          >
-            <View style={styles.engineWindow} />
-            <Text style={styles.trainValue}>{stats?.totalCo2Saved?.toFixed(1) || "0"} g</Text>
-            <Text style={[styles.trainLabel, { fontSize: 8 }]}>Total CO2 Saved</Text>
-            <View style={styles.engineHeadlight} />
-          </TouchableOpacity>
         </View>
 
         <View 
@@ -367,6 +446,24 @@ export const HomeScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             <Text style={styles.cameraIcon}>🧾</Text>
             <Text style={styles.cameraLabel}>Record Saved{"\n"}CO2</Text>
           </TouchableOpacity>
+
+          {/* Static Obstacles */}
+          {OBSTACLES.map((obs) => (
+            <View 
+              key={obs.id}
+              style={[
+                styles.obstacle, 
+                { 
+                  transform: [
+                    { translateX: obs.relX },
+                    { translateY: obs.relY }
+                  ]
+                }
+              ]}
+            >
+              <Text style={{ fontSize: obs.size - 6 }}>{obs.icon}</Text>
+            </View>
+          ))}
         </View>
 
         <View style={styles.section}>
@@ -477,19 +574,32 @@ const styles = StyleSheet.create({
   motivationalCard: { backgroundColor: "#E3F2FD", marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#BBDEFB" },
   motivationalEmoji: { fontSize: 20, marginRight: 10 },
   motivationalText: { flex: 1, fontSize: 13, color: "#1976D2", lineHeight: 18, fontWeight: "500", fontStyle: "italic" },
-  trainContainer: { flexDirection: "row", paddingHorizontal: 12, paddingVertical: 16, alignItems: "center" },
-  trainCompartment: { flex: 1, backgroundColor: "#E8F5E9", paddingVertical: 12, borderRadius: 12, alignItems: "center", borderWidth: 1, borderColor: "#C8E6C9", elevation: 3, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-  trainEngine: { borderTopRightRadius: 45, borderBottomRightRadius: 45, borderLeftWidth: 0, paddingRight: 8, overflow: 'hidden' },
-  engineWindow: { position: 'absolute', top: 0, right: 0, width: '40%', height: '100%', backgroundColor: 'rgba(255, 255, 255, 0.3)', borderTopRightRadius: 45, borderBottomRightRadius: 45 },
-  engineHeadlight: { position: 'absolute', bottom: 10, right: 8, width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFEB3B', shadowColor: '#FFEB3B', shadowRadius: 10, shadowOpacity: 1, elevation: 10 },
-  trainValue: { fontSize: normalize(16), fontWeight: "bold", color: "#2E7D32", zIndex: 2 },
-  trainLabel: { fontSize: normalize(8.5), color: "#388E3C", marginTop: 2, fontWeight: "700", textTransform: "uppercase", zIndex: 2 },
-  trainConnector: { width: 6, height: 4, backgroundColor: "#C8E6C9", marginHorizontal: -1, zIndex: -1 },
+  trainWrapper: { marginHorizontal: 0, marginBottom: 20, marginTop: 25, alignItems: 'center', width: '100%' },
+  trainContainer: { flexDirection: "row", alignItems: "flex-end", height: 75, paddingBottom: 5, width: '100%', justifyContent: 'center' },
+  trainCompartment: { width: 75, height: 62, backgroundColor: "#B2DFDB", borderRadius: 6, justifyContent: "center", alignItems: "center", position: 'relative', overflow: 'hidden', borderWidth: 1, borderColor: '#80CBC4', elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+  trainEngine: { width: 75, height: 62, borderTopRightRadius: 35, borderBottomRightRadius: 8, backgroundColor: "#E0F2F1", borderColor: '#4DB6AC', borderTopWidth: 2, borderRightWidth: 2, borderLeftWidth: 1 },
+  engineTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 22, backgroundColor: '#FFF59D', borderTopRightRadius: 35 },
+  compartmentTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 12, backgroundColor: '#E0F2F1' },
+  engineCab: { position: 'absolute', top: 4, right: 6, width: 40, height: 28, backgroundColor: '#81D4FA', borderTopRightRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: '#4FC3F7' },
+  engineWindow: { flex: 1, backgroundColor: 'rgba(255,255,255,0.3)' },
+  windowRow: { flexDirection: 'row', position: 'absolute', top: 15, width: '100%', justifyContent: 'space-around', paddingHorizontal: 5 },
+  smallWindow: { width: 22, height: 18, backgroundColor: '#81D4FA', borderRadius: 3, borderWidth: 1, borderColor: '#4FC3F7' },
+  stripeContainer: { position: 'absolute', bottom: 20, width: '100%', height: 6, justifyContent: 'center' },
+  trainStripe: { height: 4, backgroundColor: '#F8BBD0', width: '100%' },
+  trainConnector: { width: 8, height: 3, backgroundColor: "#546E7A", alignSelf: "flex-end", marginBottom: 12 },
+  trainValue: { fontSize: normalize(11), fontWeight: "900", color: "#004D40", zIndex: 5, marginTop: 12 },
+  trainLabel: { fontSize: 7, color: "#00695C", fontWeight: "800", zIndex: 5, textTransform: 'uppercase' },
+  engineHeadlight: { position: 'absolute', bottom: 6, right: 5, width: 6, height: 6, backgroundColor: '#FFD54F', borderRadius: 3, borderWidth: 1, borderColor: '#FBC02D', elevation: 4 },
+  trainTrackContainer: { width: 250, height: 15, marginTop: -5, alignItems: 'flex-start', justifyContent: 'center' },
+  railLine: { width: '100%', height: 2, backgroundColor: '#455A64', borderRadius: 1 },
+  sleeperContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingHorizontal: 5 },
+  sleeper: { width: 15, height: 3, backgroundColor: '#78909C' },
   cameraContainer: { paddingVertical: 24, flexDirection: "row", justifyContent: "center", alignItems: "center" },
   leafButton: { width: 140, height: 100, borderTopLeftRadius: 70, borderBottomRightRadius: 70, borderTopRightRadius: 20, borderBottomLeftRadius: 20, backgroundColor: "#2E7D32", justifyContent: "center", alignItems: "center", elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, gap: 4, overflow: 'hidden' },
   cameraIcon: { fontSize: 28 },
   cameraLabel: { fontSize: 13, color: "#fff", fontWeight: "bold", textAlign: "center", paddingHorizontal: 10 },
   leafSubMessage: { fontSize: 8, color: "rgba(255, 255, 255, 0.8)", fontWeight: "600", textTransform: "uppercase", marginTop: -2 },
+  obstacle: { position: 'absolute', width: 32, height: 32, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', zIndex: -1 },
   section: { paddingHorizontal: 16, paddingBottom: 16 },
   accordionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12 },
   sectionTitle: { fontSize: normalize(16), fontWeight: "bold", color: "#000" },

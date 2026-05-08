@@ -112,7 +112,7 @@ export const LoginScreen: React.FC = () => {
                 keyboardType="default"
                 autoCapitalize="none"
                 underlineColorAndroid="transparent"
-                placeholderTextColor="#000"
+                placeholderTextColor="#999"
               />
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -136,7 +136,7 @@ export const LoginScreen: React.FC = () => {
                 onChangeText={setAdminPassword}
                 secureTextEntry
                 underlineColorAndroid="transparent"
-                placeholderTextColor="#000"
+                placeholderTextColor="#999"
               />
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -167,7 +167,7 @@ export const LoginScreen: React.FC = () => {
                 keyboardType="number-pad"
                 maxLength={6}
                 underlineColorAndroid="transparent"
-                placeholderTextColor="#000"
+                placeholderTextColor="#999"
               />
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
@@ -231,7 +231,8 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     marginBottom: 16,
-    color: '#000',
+    color: '#555',
+    fontWeight: '400',
   },
   button: {
     backgroundColor: '#007AFF',

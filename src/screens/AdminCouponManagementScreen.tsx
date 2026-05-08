@@ -75,7 +75,7 @@ export const AdminCouponManagementScreen: React.FC = () => {
           value={couponCode}
           onChangeText={setCouponCode}
           autoCapitalize="characters"
-          placeholderTextColor="#000"
+          placeholderTextColor="#999"
         />
         <TextInput
           style={styles.input}
@@ -83,7 +83,7 @@ export const AdminCouponManagementScreen: React.FC = () => {
           value={discountAmount}
           onChangeText={setDiscountAmount}
           keyboardType="numeric"
-          placeholderTextColor="#000"
+          placeholderTextColor="#999"
         />
         <TouchableOpacity style={styles.button} onPress={handleSaveCoupon} disabled={loading}>
           <Text style={styles.buttonText}>{loading ? 'Saving...' : 'Save Manual Coupon'}</Text>
@@ -99,7 +99,7 @@ export const AdminCouponManagementScreen: React.FC = () => {
           value={co2Threshold}
           onChangeText={setCo2Threshold}
           keyboardType="numeric"
-          placeholderTextColor="#000"
+          placeholderTextColor="#999"
         />
         
         <View style={styles.switchRow}>
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   section: { backgroundColor: '#fff', borderRadius: 12, padding: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, color: '#007AFF' },
   label: { fontSize: 14, color: '#666', marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 12, backgroundColor: '#fafafa', color: '#000' },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 12, backgroundColor: '#fafafa', color: '#555', fontWeight: '400' },
   button: { backgroundColor: '#007AFF', padding: 14, borderRadius: 8, alignItems: 'center' },
   buttonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 10 },
