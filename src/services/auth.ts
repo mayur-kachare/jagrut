@@ -25,29 +25,43 @@ export class AuthService {
 
     const userId = isAdmin ? 'admin_user_id' : phoneNumber.toLowerCase().trim();
 
-    // 1. Build user object immediately — don't wait for Firestore
+    // Fetch existing user data from Firestore if available
+    let existingName = name || '';
+    let existingPhotoUrl = photoUrl || '';
+    let existingRole: 'user' | 'admin' = isAdmin ? 'admin' : 'user';
+
+    try {
+      const q = query(
+        collection(db, AuthService.USERS_COLLECTION),
+        where('phoneNumber', '==', phoneNumber)
+      );
+      const querySnapshot = await getDocs(q);
+      if (!querySnapshot.empty) {
+        const userData = querySnapshot.docs[0].data();
+        existingName = userData.name || existingName;
+        existingPhotoUrl = userData.photoUrl || existingPhotoUrl;
+        existingRole = userData.role || existingRole;
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not fetch existing user data during login:', e);
+    }
+
     const user: User = {
       id: userId,
       phoneNumber,
-      name: isAdmin ? 'Administrator' : (name || ''),
-      photoUrl: photoUrl || '',
-      role: isAdmin ? 'admin' : 'user',
+      name: existingName,
+      photoUrl: existingPhotoUrl,
+      role: existingRole,
       createdAt: new Date(),
     };
 
-    // 2. Save to AsyncStorage immediately so navigation works right away
+    // Save to AsyncStorage
     try {
       await AsyncStorage.setItem(this.STORAGE_KEY, JSON.stringify(user));
       console.log('✅ User saved locally:', phoneNumber);
     } catch (storageError) {
       console.error('❌ AsyncStorage error:', storageError);
-      // Even if storage fails, return the user so navigation proceeds
     }
-
-    // 3. Sync to Firestore in background — non-blocking, never delays login
-    AuthService.syncUserToFirestore(userId, phoneNumber, name, photoUrl).catch((e) =>
-      console.warn('⚠️ Firestore sync failed (non-critical):', e)
-    );
 
     return user;
   }
